@@ -31,7 +31,6 @@ class ThreadStart(QThread):
                  isShowEnd,
                  isAddBlackBorder,
                  fileurl):
-        # Thread.__init__(self)
         super(ThreadStart, self).__init__()
         self.name = name
         self.dpi = dpi
@@ -77,16 +76,35 @@ class ThreadStart(QThread):
                 dirWithFile.append(format(curdir))
 
             if len(subdirs) > 0 and len(files) == 0:
-                print("Директория с папками: " + format(curdir))
+              #  print("Директория с папками: " + format(curdir))
+                u = format(curdir)
+                u = u.replace('\\', '/')
+                array = u.split("/")
+                dir = array[-1]
 
+
+
+       # print(dirWithFile)
         array = self.fileurl.split("/")
         n1 = array[-1]
+        if not os.path.exists(n1):
+            os.makedirs(n1)
 
-        if len(dirWithFile) > 1:
+        if len(dirWithFile) > 0:
             for url in dirWithFile:
-                self.fileurl = directory = url.replace('\\', '/')
+                self.fileurl = url.replace('\\', '/')
                 array = self.fileurl.split("/")
-                self.directoryName = array[-1]
+                startSave = False
+                for nameDir in array:
+                    if startSave:
+                        self.directoryName =  self.directoryName + '/' + nameDir
+                    if nameDir == n1:
+                        startSave = True
+                        index = array.index(nameDir)
+                        self.directoryName = nameDir
+
+
+                lenArray = len(array)
 
                 dir = os.path.abspath(os.curdir)
                 dir = dir.replace('\\', '/')
@@ -105,8 +123,6 @@ class ThreadStart(QThread):
                     t1.join()
 
                     self.log.emit("STOP УДАЛЕНИЯ РАМКИ")
-
-                    # self.initRemoveBorder()
                     self.fileurl = self.dirInit
 
                 if self.isSplit:
@@ -115,8 +131,6 @@ class ThreadStart(QThread):
                     t1 = Thread(target=self.initSplitImage, daemon=True)
                     t1.start()
                     t1.join()
-
-                    # self.initSplitImage()
 
                     dir = os.path.abspath(os.curdir)
                     dir = dir.replace('\\', '/')
@@ -132,7 +146,6 @@ class ThreadStart(QThread):
                     t1.join()
 
                     self.log.emit("STOP УДАЛЕНИЯ РАМКИ ДОП")
-                    # self.initRemovePostBorder()
 
                 if self.isAddBlackBorder:
                     self.log.emit("START ДОБАВЛЕНИЯ РАМКИ")
@@ -142,8 +155,6 @@ class ThreadStart(QThread):
                     t1.join()
 
                     self.log.emit("STOP ДОБАВЛЕНИЯ РАМКИ")
-
-                    # self.initAddBorder()
                     self.fileurl = self.dirInit
 
                 if self.isRemoveBorder and self.isSplit:
@@ -160,6 +171,11 @@ class ThreadStart(QThread):
             dir = dir.replace('\\', '/')
             self.dirInit = dir + '/' + self.directoryName + self.postfix
 
+            print("Директория с папками 2: " + format(self.directoryName))
+
+            if not os.path.exists(self.directoryName):
+                os.makedirs(self.directoryName)
+
             dirName = self.fileurl
             listOfFiles = list()
             for (dirpath, dirnames, filenames) in os.walk(dirName):
@@ -173,8 +189,6 @@ class ThreadStart(QThread):
                 t1.join()
 
                 self.log.emit("STOP УДАЛЕНИЯ РАМКИ")
-
-                # self.initRemoveBorder()
                 self.fileurl = self.dirInit
 
             if self.isSplit:
@@ -183,8 +197,6 @@ class ThreadStart(QThread):
                 t1 = Thread(target=self.initSplitImage, daemon=True)
                 t1.start()
                 t1.join()
-
-                # self.initSplitImage()
 
                 dir = os.path.abspath(os.curdir)
                 dir = dir.replace('\\', '/')
@@ -200,7 +212,6 @@ class ThreadStart(QThread):
                 t1.join()
 
                 self.log.emit("STOP УДАЛЕНИЯ РАМКИ ДОП")
-                # self.initRemovePostBorder()
 
             if self.isAddBlackBorder:
                 self.log.emit("START ДОБАВЛЕНИЯ РАМКИ")
@@ -210,8 +221,6 @@ class ThreadStart(QThread):
                 t1.join()
 
                 self.log.emit("STOP ДОБАВЛЕНИЯ РАМКИ")
-
-                # self.initAddBorder()
                 self.fileurl = self.dirInit
 
             if self.isRemoveBorder and self.isSplit:
@@ -220,6 +229,12 @@ class ThreadStart(QThread):
                 shutil.rmtree(dir + '/' + self.directoryName + self.postfix)
                 self.fileurl = dir + '/' + self.directoryName
                 self.rename()
+
+        #for dirpath, dirnames, filenames in os.walk(os.path.abspath(os.curdir)):
+           # print(f'Найден каталог: {dirpath}')
+            #if '(до разделения на страницы)' in dirpath:
+                #os.rename(dirpath, dirpath[:-27])
+
 
         if self.isShowEnd:
             self.end.emit("STOP")

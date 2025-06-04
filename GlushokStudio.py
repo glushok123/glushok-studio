@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import *
 from threading import Thread
 from module.ThreadStart import ThreadStart
 
-
+#pyinstaller --onefile  .\GlushokStudio.py
 class MainApp(QMainWindow, Thread):
     def __init__(self):
         super().__init__()

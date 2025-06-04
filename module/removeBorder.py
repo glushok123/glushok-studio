@@ -15,12 +15,15 @@ mpl = multiprocessing.log_to_stderr()
 mpl.setLevel(logging.INFO)
 import time
 from threading import Thread
+import cv2
+import imutils
+from skimage.filters import threshold_local
 
 
 def initRemoveBorder(self):
     procent = 0
     array = self.fileurl.split("/")
-    self.directoryName = array[-1]
+    #self.directoryName = array[-1]
 
     if not os.path.exists(self.directoryName + self.postfix):
         os.makedirs(self.directoryName + self.postfix)
@@ -32,11 +35,10 @@ def initRemoveBorder(self):
 
     countFile = len(listOfFiles)
 
-    print('__СТАРТ УДАЛЕНИЯ РАМКИ__')
+    print('__СТАРТ УДАЛЕНИЯ РАМКИ__' + str(countFile))
     with futures.ThreadPoolExecutor(max_workers=self.count_cpu) as ex:
-        ex.map(self.removeBorder, listOfFiles)
         for result in ex.map(self.removeBorder, listOfFiles):
-            print(str(result) + " (Удаление черной рамки)")
+            #print(str(result) + " (Удаление черной рамки)")
             procent = procent + 1
             self.proc.emit(int((procent * 100) / countFile))
             #self.statusLoaded()
@@ -48,6 +50,7 @@ def removeBorder(self, imageName):
     try:
         two_conture = False
         imageUrl = self.fileurl + imageName
+        #print(imageUrl)
         stream = open(imageUrl, "rb")
         bytes = bytearray(stream.read())
         numpyarray = np.asarray(bytes, dtype=np.uint8)
@@ -113,21 +116,24 @@ def removeBorder(self, imageName):
                     right_x = c_right_x
 
         if largest_area != 0 and second_area != 0 and (largest_area - second_area) < 3000000:
-            # print('Обнаружил 2 больших контура')
+            print('Обнаружил 2 больших контура')
+            #print(largest_area)
+            #print(second_area)
+            #print(largest_area - second_area)
             x2, y2, w2, h2 = cv2.boundingRect(cnts[s_index])
             two_conture = True
-            # cv2.rectangle(image, (x2, y2), (x2 + w2, y2 + h2), (229, 11, 11), 2)
+            #cv2.rectangle(image, (x2, y2), (x2 + w2, y2 + h2), (229, 11, 11), 2)
 
-        # cv2.drawContours(image, cnts, -1, (0,255,0), 2)
-        # cv2.drawContours(image, cnts, l_index, (11, 33, 229), 2)
-        # cv2.drawContours(image, cnts, s_index, (229, 11, 11), 2)
+        #cv2.drawContours(image, cnts, -1, (0,255,0), 2)
+        #cv2.drawContours(image, cnts, l_index, (11, 33, 229), 2)
+        #cv2.drawContours(image, cnts, s_index, (229, 11, 11), 2)
         # find the biggest area
         c = max(cnts, key=cv2.contourArea)
         x, y, w, h = cv2.boundingRect(c)
 
-        # cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        imS = cv2.resize(image, (1000, 1000))
-        # cv2.imshow("Result", np.hstack([imS]))
+        #cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        #imS = cv2.resize(image, (1000, 1000))
+        #cv2.imshow("Result", np.hstack([imS]))
 
         displayCnt = None
 
@@ -143,10 +149,12 @@ def removeBorder(self, imageName):
 
         if not two_conture:
             if self.isAddBorder:
+                #print(x, y , w, y)
                 x = x - self.border_px
                 w = w + 2 * self.border_px
                 y = y - self.border_px
                 h = h + 2 * self.border_px
+                #print(x, y, w, h)
 
             points[0][0] = x
             points[1][0] = x
@@ -158,28 +166,59 @@ def removeBorder(self, imageName):
             points[2][1] = y + h
             points[3][1] = y
         else:
+            #print(x, y, w, h)
+            #print(x2, y2, w2, h2)
             if x < x2:
+                #y = 600
+                kf = 0
+
+                if (y < y2 and (y2 - y + h2) < h + h2):
+                    kf = y2 - y
+
+
+                #h = h + h2 + kf
+
+                if (y > y2):
+                    y = y2
+
+
+                if(h < h2):
+                    h = h2
+
                 if self.isAddBorder:
+                    w = (w - x) + (x2 - w) + w2 + 2*self.border_px
                     x = x - self.border_px
-                    w2 = w2 + self.border_px
                     y = y - self.border_px
                     h = h + 2 * self.border_px
 
                 points[0][0] = x
                 points[1][0] = x
-                points[2][0] = x2 + w2
-                points[3][0] = x2 + w2
+                points[2][0] = x + w
+                points[3][0] = x + w
 
                 points[0][1] = y
                 points[1][1] = y + h
                 points[2][1] = y + h
                 points[3][1] = y
+
+                #print(y)
+                #print(y + h)
+                #print(y + h)
+                #print(y)
             else:
-                # x2 = left_x
+                kf = 0
+
+                if (y < y2 and (y2 - y + h2) < h + h2):
+                    kf = y2 - y
+
+                h = h + h2 + kf
+
+                if (y > y2):
+                    y = y2
 
                 if self.isAddBorder:
                     x2 = x2 - self.border_px
-                    w = w + self.border_px
+                    w = w + 2*self.border_px
                     y = y - self.border_px
                     h = h + 2 * self.border_px
 

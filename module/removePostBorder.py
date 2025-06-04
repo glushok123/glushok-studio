@@ -12,7 +12,7 @@ from concurrent import futures
 
 def initRemovePostBorder(self):
     array = self.fileurl.split("/")
-    self.directoryName = array[-1]
+    #self.directoryName = array[-1]
 
     if not os.path.exists(self.directoryName):
         os.makedirs(self.directoryName)

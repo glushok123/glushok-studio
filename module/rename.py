@@ -24,7 +24,9 @@ def rename(self):
             if len(str(count)) == 2:
                 newNameFile = '0' + str(count)
 
-            replaceName = self.directoryName + "_" + str(newNameFile) + "." + array[-1]
+            array = self.fileurl.split("/")
+            d = array[-1]
+            replaceName = d + "_" + str(newNameFile) + "." + array[-1]
 
             x = f.replace(nameFile + "." + array[-1], replaceName)
             os.rename(f, x)
