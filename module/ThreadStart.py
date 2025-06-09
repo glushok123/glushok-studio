@@ -54,6 +54,7 @@ class ThreadStart(QThread):
         self.postfix = '(до разделения на страницы)'
         self.width_img = 0
         self.height_img = 0
+        self.original_fileurl = fileurl  # ← сохраним исходный путь отдельно
 
     from module.splitImage import initSplitImage, parseImage
     from module.removeBorder import initRemoveBorder, removeBorder
@@ -63,8 +64,90 @@ class ThreadStart(QThread):
     from module.addListWidget import showStartImage, showEndImage
 
     def run(self):
-        self.log.emit("Основной поток запущен")
-        self.process()
+        try:
+            self.log.emit("Основной поток запущен")
+            self.process()
+
+            import time
+
+            base_path = os.path.abspath(os.curdir)
+            self.log.emit(f"DEBUG: запускаем переименование в {base_path}")
+
+            try:
+                for name in os.listdir(base_path):
+                    full_path = os.path.join(base_path, name)
+                    self.log.emit(f"Проверка: {name}")
+
+                    if not os.path.isdir(full_path):
+                        self.log.emit(f"Пропущено (не папка): {name}")
+                        continue
+
+                    if '(до разделения на страницы)' not in name:
+                        self.log.emit(f"Пропущено (нет шаблона): {name}")
+                        continue
+
+                    # Определяем новое имя и путь
+                    new_name = name.replace(' (до разделения на страницы)', '').replace('(до разделения на страницы)',
+                                                                                        '')
+                    new_path = os.path.join(base_path, new_name)
+
+                    self.log.emit(f"Найдено: {name} → {new_name}")
+
+                    if os.path.exists(new_path):
+                        # Проверяем, пуста ли целевая папка
+                        if not os.listdir(new_path):
+                            self.log.emit(f"Целевая папка {new_name} пуста. Перемещаем содержимое...")
+                            try:
+                                for item in os.listdir(full_path):
+                                    shutil.move(os.path.join(full_path, item), new_path)
+                                os.rmdir(full_path)
+                                self.log.emit(f"Перенос завершён. Удалена папка: {name}")
+                            except Exception as e:
+                                self.log.emit(f"Ошибка при переносе в {new_name}: {str(e)}")
+                        else:
+                            self.log.emit(f"Пропущено: {new_name} уже существует и не пуста")
+                    else:
+                        try:
+                            os.rename(full_path, new_path)
+                            self.log.emit(f"Переименовано: {name} → {new_name}")
+                        except Exception as e:
+                            self.log.emit(f"Ошибка при переименовании {name}: {str(e)}")
+
+            except Exception as e:
+                self.log.emit(f"ОШИБКА ПРИ ПЕРЕИМЕНОВАНИИ: {str(e)}")
+
+            # Перемещение итоговой папки рядом с программой
+            # --- Блок переноса результата в структуру родителя (например 024/955172) ---
+            try:
+                base_path = os.path.abspath(os.curdir)
+                original_parts = os.path.normpath(self.original_fileurl).split(os.sep)
+
+                # Берем максимум 2 последних элемента, начиная с родителя
+                if len(original_parts) >= 2:
+                    sub_path_parts = original_parts[-2:]  # например ['024', '955172']
+                else:
+                    sub_path_parts = original_parts[-1:]
+
+                result_dir = os.path.join(base_path, *sub_path_parts)
+                source_dir = os.path.join(base_path, self.directoryName)
+
+                self.log.emit(f"[DEBUG] source_dir = {repr(source_dir)}")
+                self.log.emit(f"[DEBUG] result_dir = {repr(result_dir)}")
+
+                if os.path.abspath(source_dir) == os.path.abspath(result_dir):
+                    self.log.emit(f"[DEBUG] Итоговая папка уже на месте: {result_dir}")
+                else:
+                    os.makedirs(os.path.dirname(result_dir), exist_ok=True)
+                    shutil.move(source_dir, result_dir)
+                    self.log.emit(f"Итоговая папка перемещена в: {result_dir}")
+            except Exception as e:
+                self.log.emit(f"Ошибка при переносе итоговой папки: {str(e)}")
+
+            self.log.emit("КОНЕЦ ОБРАБОТКИ")
+            self.end.emit("STOP")  # ← теперь всегда вызывается, даже при isShowEnd = False
+        except Exception as e:
+            self.log.emit(f"ОШИБКА В run(): {str(e)}")
+            self.end.emit("ERROR")
 
     def process(self):
         self.log.emit("Старт обработки")
@@ -163,6 +246,7 @@ class ThreadStart(QThread):
                     shutil.rmtree(dir + '/' + self.directoryName + self.postfix)
                     self.fileurl = dir + '/' + self.directoryName
                     self.rename()
+
         else:
             array = self.fileurl.split("/")
             self.directoryName = array[-1]
@@ -230,13 +314,10 @@ class ThreadStart(QThread):
                 self.fileurl = dir + '/' + self.directoryName
                 self.rename()
 
-        #for dirpath, dirnames, filenames in os.walk(os.path.abspath(os.curdir)):
-           # print(f'Найден каталог: {dirpath}')
-            #if '(до разделения на страницы)' in dirpath:
-                #os.rename(dirpath, dirpath[:-27])
 
 
-        if self.isShowEnd:
-            self.end.emit("STOP")
+        # if self.isShowEnd:
+       #     self.end.emit("STOP")
 
         self.log.emit("КОНЕЦ ОБРАБОТКИ")
+        self.log.emit("DEBUG: дошёл до конца process()")

@@ -7,57 +7,24 @@ from PyQt5.QtGui import QTextCursor, QIcon, QImage
 from PyQt5.QtWidgets import *
 from threading import Thread
 from module.ThreadStart import ThreadStart
+from PyQt5.QtGui import QMovie, QColor
+from functools import partial
 
 #pyinstaller --onefile  .\GlushokStudio.py
-class MainApp(QMainWindow, Thread):
+
+class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.textEdit_8 = None
-        self.textEdit_9 = None
-        self.action = None
-        self.listWidget = None
-        self.listWidget_2 = None
-        self.checkBox_4 = None
-        self.checkBox_5 = None
-        self.checkBox_6 = None
-        self.checkBox_7 = None
-        self.checkBox_8 = None
-        self.label_8 = None
-        self.label_8 = None
-        self.label_8 = None
-        self.checkBox_6 = None
-        self.textEdit = None
-        self.label = None
-        self.progressBar = None
-        self.label = None
-        self.progressBar = None
-        self.checkBox_2 = None
-        self.checkBox_3 = None
-        self.checkBox = None
-        self.textEdit_3 = None
-        self.textEdit_5 = None
-        self.textEdit_6 = None
-        self.textEdit_2 = None
-        self.textEdit_4 = None
-        self.pushButton_2 = None
-        self.pushButton = None
-        uic.loadUi('gui/index.ui', self)
+        from PyQt5.uic import loadUi
+        loadUi('gui/index.ui', self)
+
+        # Очередь папок: каждый элемент — словарь {'path': str, 'status': str, 'progress': int}
+        self.folderQueue = []
+        self.currentIndex = 0
+        self.isProcessing = False
+
+        # Параметры обработки (оставил неизменными, как было)
         self.dpi = ''
-        self.countFile = 0
-        self.dirInit = ''
-        self.width_img = 0
-        self.height_img = 0
-        self.dirInit = ''
-        self.isRemoveBorder = ''
-        self.isSplit = ''
-        self.isAddBorder = ''
-        self.isShowStart = True
-        self.isShowEnd = True
-        self.isAddBorderForAll = True
-        self.isAddBorderForAll = True
-        self.isAddBlackBorder = False
-        self.isPxIdentically = False
-        self.fileurl = ''
         self.width_px = 100
         self.count_cpu = 4
         self.kf_w = 0.6
@@ -65,62 +32,216 @@ class MainApp(QMainWindow, Thread):
         self.pxStartList = 300
         self.pxMediumVal = 100
         self.border_px = 100
-        self.arrayErrorFile = []
-        self.directoryName = ''
-        self.postfix = '(до разделения на страницы)'
-        self.procent = 0
-        self.countFile = 0
-        self.thread = None
-        self.worker = None
-        self.gif = None
-        self.threadStart = None
-        self.isUseTread = True
+        self.isRemoveBorder = ''
+        self.isSplit = ''
+        self.isAddBorder = ''
+        self.isShowStart = True
+        self.isShowEnd = True
+        self.isAddBorderForAll = True
+        self.isAddBlackBorder = False
+        self.isPxIdentically = False
+
+        # Пути к helper-функциям из module.helper и module.addListWidget
+        from module.helper import statusLoaded, updateLog, setParamsUi, Clicked, getUrl, prepeaImageEnd
+        from module.addListWidget import showStartImage, showEndImage
+
+        # Привязываем методы к экземпляру
+        self.statusLoaded = statusLoaded.__get__(self)
+        self.updateLog = updateLog.__get__(self)
+        self.setParamsUi = setParamsUi.__get__(self)
+        self.Clicked = Clicked.__get__(self)
+        self.getUrl = getUrl.__get__(self)
+        self.prepeaImageEnd = prepeaImageEnd.__get__(self)
+        self.showStartImage = showStartImage.__get__(self)
+        self.showEndImage = showEndImage.__get__(self)
+
         self.initUI()
 
-    from module.helper import statusLoaded, updateLog, setParamsUi, Clicked, getUrl, prepeaImageEnd
-    from module.addListWidget import showStartImage, showEndImage
-
     def initUI(self):
-        self.pushButton.clicked.connect(self.startTread)
-        self.pushButton_2.clicked.connect(self.getUrl)
+        # Кнопка "ВЫПОЛНИТЬ" теперь запускает очередь
+        self.pushButton.clicked.connect(self.startQueueProcessing)
+
+        # Старая логика выбора папки (для одиночного файла) осталась на месте
+       # self.pushButton_2.clicked.connect(self.getUrl)
         self.action.triggered.connect(self.getUrl)
         self.listWidget.itemClicked.connect(self.Clicked)
         self.listWidget_2.itemClicked.connect(self.Clicked)
 
-    def ignore_files(self, dir, files):
-        return [f for f in files if os.path.isfile(os.path.join(dir, f))]
+        # Новые кнопки управления очередью
+        self.addFolderButton.clicked.connect(self.addFolderToQueue)
+        self.removeFolderButton.clicked.connect(self.removeFolderFromQueue)
 
-    def startTread(self):
+    def addFolderToQueue(self):
+        """
+        Открывает QFileDialog с возможностью множественного выбора папок.
+        Для каждой новой папки добавляет в self.folderQueue и в QListWidget.
+        """
+        dialog = QFileDialog()
+        dialog.setFileMode(QFileDialog.Directory)
+        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        dialog.setOption(QFileDialog.ShowDirsOnly, True)
+
+        # Хак для мультивыбора в QDialog
+        view = dialog.findChild(QListView, "listView")
+        if view:
+            view.setSelectionMode(QAbstractItemView.MultiSelection)
+        tree = dialog.findChild(QTreeView)
+        if tree:
+            tree.setSelectionMode(QAbstractItemView.MultiSelection)
+
+        if dialog.exec_():
+            folders = dialog.selectedFiles()
+            for folder in folders:
+                # Проверяем, нет ли уже этой папки в очереди
+                if folder not in [item['path'] for item in self.folderQueue]:
+                    self.folderQueue.append({'path': folder, 'status': 'Ожидает', 'progress': 0})
+                    self.addFolderToListWidget(folder, 'Ожидает')
+
+    def removeFolderFromQueue(self):
+        """
+        Удаляет из очереди выбранные элементы (по выделенным QListWidgetItem).
+        """
+        selected = self.folderQueueList.selectedItems()
+        for item in selected:
+            row = self.folderQueueList.row(item)
+            self.folderQueueList.takeItem(row)
+            del self.folderQueue[row]
+
+    def addFolderToListWidget(self, folder, status):
+        """
+        Заводит новый QListWidgetItem с текстом "<путь> — [0%] [Ожидает]" и серым цветом.
+        """
+        text = f"{folder} — [0%] [{status}]"
+        item = QListWidgetItem(text)
+        item.setForeground(self.getStatusColor(status))
+        self.folderQueueList.addItem(item)
+
+    def updateFolderStatus(self, folder, status, progress=None):
+        """
+        Обновляет self.folderQueue[i]['status'] и (опционально) ['progress'],
+        а затем меняет текст и цвет соответствующего QListWidgetItem.
+        """
+        for i, entry in enumerate(self.folderQueue):
+            if entry['path'] == folder:
+                entry['status'] = status
+                if progress is not None:
+                    entry['progress'] = progress
+                text = f"{folder} — [{entry['progress']}%] [{status}]"
+                item = self.folderQueueList.item(i)
+                item.setText(text)
+                item.setForeground(self.getStatusColor(status))
+                break
+
+    def getStatusColor(self, status):
+        """
+        Возвращает QColor в зависимости от статуса.
+        """
+        colors = {
+            'Ожидает': QColor('gray'),
+            'Обрабатывается': QColor('blue'),
+            'Готово': QColor('green'),
+            'Ошибка': QColor('red'),
+        }
+        return colors.get(status, QColor('black'))
+
+    def startQueueProcessing(self):
+        """
+        Запускает построчную (последовательную) обработку всех папок из self.folderQueue.
+        """
+        if self.isProcessing:
+            return  # Если уже идёт обработка, игнорируем повторный вызов
+
+        if not self.folderQueue:
+            self.updateLog("Очередь пуста.")
+            return
+
+        self.currentIndex = 0
+        self.isProcessing = True
+        self.processNextFolder()
+
+    def processNextFolder(self):
+        """
+        Запускает ThreadStart для текущего индекса self.currentIndex.
+        Когда будет вызван finishFolder, автоматически перейдёт к следующей папке.
+        """
+        # Если вышли за границы, финишируем всю очередь
+        if self.currentIndex >= len(self.folderQueue):
+            self.isProcessing = False
+            self.updateLog("Обработка очереди завершена.")
+            return
+
+        entry = self.folderQueue[self.currentIndex]
+        path = entry['path']
+
+        # Помечаем статус "Обрабатывается" и сбрасываем прогресс
+        self.updateFolderStatus(path, 'Обрабатывается', 0)
+
+        # Стандартная анимация и установка параметров (как было)
         self.statusLoaded(0)
-        path = 'load.gif'
-        self.gif = QtGui.QMovie(path)
+        self.gif = QMovie('load.gif')
         self.label_8.setMovie(self.gif)
         self.gif.start()
         self.setParamsUi()
+        self.fileurl = path
 
-        self.threadStart = ThreadStart("ThreadStart",
-                                       self.dpi,
-                                       self.kf_w,
-                                       self.kf_h,
-                                       self.width_px,
-                                       self.border_px,
-                                       self.pxStartList,
-                                       self.pxMediumVal,
-                                       self.count_cpu,
-                                       self.isRemoveBorder,
-                                       self.isSplit,
-                                       self.isAddBorder,
-                                       self.isAddBorderForAll,
-                                       self.isPxIdentically,
-                                       self.isShowStart,
-                                       self.isShowEnd,
-                                       self.isAddBlackBorder,
-                                       self.fileurl)
+        # Создаём и запускаем поток для обработки этой папки
+        self.threadStart = ThreadStart(
+            "ThreadStart",
+            self.dpi,
+            self.kf_w,
+            self.kf_h,
+            self.width_px,
+            self.border_px,
+            self.pxStartList,
+            self.pxMediumVal,
+            self.count_cpu,
+            self.isRemoveBorder,
+            self.isSplit,
+            self.isAddBorder,
+            self.isAddBorderForAll,
+            self.isPxIdentically,
+            self.isShowStart,
+            self.isShowEnd,
+            self.isAddBlackBorder,
+            self.fileurl
+        )
 
+        # Лог
         self.threadStart.log.connect(self.updateLog)
-        self.threadStart.end.connect(self.prepeaImageEnd)
-        self.threadStart.proc.connect(self.statusLoaded)
+
+        # Сигнал прогресса: partial не нужен, потому что updateFolderStatus ждёт (folder, status, progress)
+        self.threadStart.proc.connect(lambda p, folder=path: self.updateFolderStatus(folder, 'Обрабатывается', p))
+
+        # Сигнал конца: используем lambda, чтобы игнорировать аргумент, передаваемый сигнальным emit("STOP")
+        self.threadStart.end.connect(lambda _ , folder=path: self.finishFolder(folder))
+
+        # Обработчик ошибок: если поток упадёт, ловим исключение и ставим статус "Ошибка"
+        self.threadStart.finished.connect(lambda folder=path: self.checkThreadError(folder))
+
         self.threadStart.start()
+
+    def finishFolder(self, path):
+        """
+        Вызывается, когда поток для папки path успешно завершился.
+        Меняем статус на "Готово" и запускаем следующий.
+        """
+        self.updateFolderStatus(path, 'Готово', 100)
+        self.currentIndex += 1
+        self.processNextFolder()
+
+    def checkThreadError(self, path):
+        """
+        Этот слот вызывается, когда QThread полностью завершил работу.
+        Проверим, если статус по-прежнему "Обрабатывается" (а поток не вызвал finishFolder),
+        то значит была ошибка, и ставим "Ошибка".
+        """
+        # Найдём запись в очереди
+        for entry in self.folderQueue:
+            if entry['path'] == path:
+                if entry['status'] == 'Обрабатывается':
+                    # Поток завершился без вызова finishFolder → ошибка
+                    self.updateFolderStatus(path, 'Ошибка', entry['progress'])
+                break
 
 
 if __name__ == '__main__':
