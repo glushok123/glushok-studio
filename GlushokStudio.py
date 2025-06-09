@@ -74,7 +74,8 @@ class MainApp(QMainWindow):
     def addFolderToQueue(self):
         """
         Открывает QFileDialog с возможностью множественного выбора папок.
-        Для каждой новой папки добавляет в self.folderQueue и в QListWidget.
+        Проверяет содержимое каждой папки и добавляет в очередь только папки с изображениями
+        или папки, содержащие другие папки с изображениями.
         """
         dialog = QFileDialog()
         dialog.setFileMode(QFileDialog.Directory)
@@ -92,10 +93,67 @@ class MainApp(QMainWindow):
         if dialog.exec_():
             folders = dialog.selectedFiles()
             for folder in folders:
+                # Нормализуем путь, заменяя обратные слеши на прямые
+                folder = folder.replace('\\', '/')
+                
                 # Проверяем, нет ли уже этой папки в очереди
                 if folder not in [item['path'] for item in self.folderQueue]:
-                    self.folderQueue.append({'path': folder, 'status': 'Ожидает', 'progress': 0})
-                    self.addFolderToListWidget(folder, 'Ожидает')
+                    # Проверяем содержимое папки
+                    valid_folders = self.checkFolderContent(folder)
+                    
+                    if valid_folders:
+                        for valid_folder in valid_folders:
+                            # Нормализуем путь для каждой найденной папки
+                            valid_folder = valid_folder.replace('\\', '/')
+                            if valid_folder not in [item['path'] for item in self.folderQueue]:
+                                self.folderQueue.append({'path': valid_folder, 'status': 'Ожидает', 'progress': 0})
+                                self.addFolderToListWidget(valid_folder, 'Ожидает')
+                    else:
+                        QMessageBox.warning(self, "Предупреждение", 
+                                          f"Папка {folder} не содержит изображений или папок с изображениями.")
+
+    def checkFolderContent(self, folder_path):
+        """
+        Проверяет содержимое папки и возвращает список папок, которые содержат изображения.
+        
+        Args:
+            folder_path (str): Путь к проверяемой папке
+            
+        Returns:
+            list: Список путей к папкам, содержащим изображения
+        """
+        valid_folders = []
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.webp'}
+        
+        # Нормализуем путь
+        folder_path = folder_path.replace('\\', '/')
+        
+        # Проверяем, содержит ли текущая папка изображения
+        has_images = False
+        has_subfolders = False
+        
+        for item in os.listdir(folder_path):
+            item_path = os.path.join(folder_path, item)
+            if os.path.isfile(item_path):
+                if os.path.splitext(item.lower())[1] in image_extensions:
+                    has_images = True
+                    break
+            elif os.path.isdir(item_path):
+                has_subfolders = True
+        
+        # Если папка содержит изображения, добавляем её
+        if has_images:
+            valid_folders.append(folder_path)
+        
+        # Если папка содержит подпапки, проверяем их
+        if has_subfolders:
+            for item in os.listdir(folder_path):
+                item_path = os.path.join(folder_path, item)
+                if os.path.isdir(item_path):
+                    subfolders = self.checkFolderContent(item_path)
+                    valid_folders.extend(subfolders)
+        
+        return valid_folders
 
     def removeFolderFromQueue(self):
         """
@@ -176,7 +234,7 @@ class MainApp(QMainWindow):
         # Помечаем статус "Обрабатывается" и сбрасываем прогресс
         self.updateFolderStatus(path, 'Обрабатывается', 0)
 
-        # Стандартная анимация и установка параметров (как было)
+        # Стандартная анимация и установка параметров
         self.statusLoaded(0)
         self.gif = QMovie('load.gif')
         self.label_8.setMovie(self.gif)
@@ -209,16 +267,18 @@ class MainApp(QMainWindow):
         # Лог
         self.threadStart.log.connect(self.updateLog)
 
-        # Сигнал прогресса: partial не нужен, потому что updateFolderStatus ждёт (folder, status, progress)
+        # Сигнал прогресса
         self.threadStart.proc.connect(lambda p, folder=path: self.updateFolderStatus(folder, 'Обрабатывается', p))
 
-        # Сигнал конца: используем lambda, чтобы игнорировать аргумент, передаваемый сигнальным emit("STOP")
-        self.threadStart.end.connect(lambda _ , folder=path: self.finishFolder(folder))
+        # Сигнал конца
+        self.threadStart.end.connect(lambda _, folder=path: self.finishFolder(folder))
 
-        # Обработчик ошибок: если поток упадёт, ловим исключение и ставим статус "Ошибка"
+        # Обработчик ошибок
         self.threadStart.finished.connect(lambda folder=path: self.checkThreadError(folder))
 
+        # Запускаем поток
         self.threadStart.start()
+        self.updateLog(f"Начата обработка папки: {path}")
 
     def finishFolder(self, path):
         """

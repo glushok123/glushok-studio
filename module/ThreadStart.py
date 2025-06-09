@@ -66,6 +66,16 @@ class ThreadStart(QThread):
     def run(self):
         try:
             self.log.emit("Основной поток запущен")
+            self.log.emit(f"[DEBUG] Параметры обработки:")
+            self.log.emit(f"[DEBUG] DPI: {self.dpi}")
+            self.log.emit(f"[DEBUG] Коэффициенты: w={self.kf_w}, h={self.kf_h}")
+            self.log.emit(f"[DEBUG] Ширина: {self.width_px}")
+            self.log.emit(f"[DEBUG] Граница: {self.border_px}")
+            self.log.emit(f"[DEBUG] Удаление рамки: {self.isRemoveBorder}")
+            self.log.emit(f"[DEBUG] Разделение: {self.isSplit}")
+            self.log.emit(f"[DEBUG] Добавление рамки: {self.isAddBorder}")
+            self.log.emit(f"[DEBUG] Путь к файлу: {self.fileurl}")
+            
             self.process()
 
             import time
