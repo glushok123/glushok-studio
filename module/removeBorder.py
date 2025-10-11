@@ -58,10 +58,22 @@ def removeBorder(self, file_path: Path) -> str | None:
         save_with_dpi(image, save_path, self.dpi)
         return str(save_path)
 
+    margin = self.border_px if self.isAddBorderForAll else 0
+    left = max(0, x + margin)
+    top = max(0, y + margin)
+    right = min(width, x + w - margin)
+    bottom = min(height, y + h - margin)
+
+    if left >= right or top >= bottom:
+        # fallback to the detected bounding box when the margin is too large
+        left, top, right, bottom = x, y, x + w, y + h
+
+    cropped = image[top:bottom, left:right]
+
     if self.isAddBorder:
-        padded = apply_border(image[y : y + h, x : x + w], self.border_px)
+        padded = apply_border(cropped, self.border_px)
     else:
-        padded = image[y : y + h, x : x + w]
+        padded = cropped
 
     save_path = target_dir / relative.name
     save_with_dpi(padded, save_path, self.dpi)
