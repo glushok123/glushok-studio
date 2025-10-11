@@ -119,16 +119,80 @@ def detect_content_bounds(gray: np.ndarray) -> BoundingBox | None:
     if gray.ndim != 2:
         raise ValueError("detect_content_bounds expects a single channel image")
 
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    height, width = gray.shape
+    image_area = float(width * height)
+    if image_area == 0:
+        return None
 
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Heuristic: if most of the page ended up black (e.g. the scan is dark),
+    # invert the mask so that the document becomes the bright region.
+    white_ratio = cv2.countNonZero(thresh) / image_area
+    if white_ratio < 0.1:
+        thresh = cv2.bitwise_not(thresh)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(cleaned, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
 
-    contour = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(contour)
-    return BoundingBox(left=x, top=y, right=x + w, bottom=y + h)
+    min_area = image_area * 0.01
+    boxes: list[BoundingBox] = []
+    for contour in contours:
+        if cv2.contourArea(contour) < min_area:
+            continue
+        x, y, w, h = cv2.boundingRect(contour)
+        boxes.append(BoundingBox(left=x, top=y, right=x + w, bottom=y + h))
+
+    if not boxes:
+        contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(contour)
+        boxes.append(BoundingBox(left=x, top=y, right=x + w, bottom=y + h))
+
+    left = min(box.left for box in boxes)
+    top = min(box.top for box in boxes)
+    right = max(box.right for box in boxes)
+    bottom = max(box.bottom for box in boxes)
+
+    left = int(np.clip(left, 0, width))
+    top = int(np.clip(top, 0, height))
+    right = int(np.clip(right, left, width))
+    bottom = int(np.clip(bottom, top, height))
+
+    if right - left <= 0 or bottom - top <= 0:
+        return None
+
+    return BoundingBox(left=left, top=top, right=right, bottom=bottom)
+
+
+def crop_to_content(
+    image: np.ndarray,
+    pad_x: int = 0,
+    pad_y: int = 0,
+    bounds: BoundingBox | None = None,
+) -> tuple[np.ndarray, BoundingBox] | tuple[None, None]:
+    """Crop *image* to the detected document bounds and return the crop."""
+
+    if bounds is None:
+        if image.ndim == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
+
+        bounds = detect_content_bounds(gray)
+    if bounds is None:
+        return None, None
+
+    expanded = bounds.expand(image.shape, pad_x, pad_y)
+    if expanded.width <= 0 or expanded.height <= 0:
+        return None, None
+
+    cropped = image[expanded.top : expanded.bottom, expanded.left : expanded.right]
+    return cropped, expanded
 
 
 @dataclass(frozen=True)
