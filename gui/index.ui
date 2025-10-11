@@ -518,20 +518,27 @@ QStatusBar {
                </property>
               </widget>
              </item>
-             <item row="3" column="0">
-              <widget class="QCheckBox" name="checkBox_6">
-               <property name="text">
-                <string>Показывать изначальные сканы</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="1">
-              <widget class="QCheckBox" name="checkBox_7">
-               <property name="text">
-                <string>Показывать готовые сканы</string>
-               </property>
-              </widget>
-             </item>
+            <item row="3" column="0" colspan="2">
+             <widget class="QCheckBox" name="checkBox_9">
+              <property name="text">
+               <string>Ручная корректировка середины изображения</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QCheckBox" name="checkBox_6">
+              <property name="text">
+               <string>Показывать изначальные сканы</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QCheckBox" name="checkBox_7">
+              <property name="text">
+               <string>Показывать готовые сканы</string>
+              </property>
+             </widget>
+            </item>
             </layout>
            </widget>
           </item>

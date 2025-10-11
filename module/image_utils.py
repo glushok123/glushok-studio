@@ -272,6 +272,28 @@ def find_split_column(
     return int(np.clip(split_x, 0, width - 1)), bool(is_confident)
 
 
+def _build_split_result(colour: np.ndarray, split_x: int, overlap: int) -> SplitResult:
+    """Create a :class:`SplitResult` using a fixed ``split_x`` position."""
+
+    height, width = colour.shape[:2]
+    split_x = int(np.clip(split_x, 0, width - 1))
+
+    overlap = max(0, int(overlap))
+    left_end = min(width, split_x + overlap)
+    right_start = max(0, split_x - overlap)
+
+    left_page = colour[:, :left_end]
+    right_page = colour[:, right_start:]
+
+    if left_page.size == 0 or right_page.size == 0:
+        half = width // 2
+        left_page = colour[:, :half]
+        right_page = colour[:, half:]
+        split_x = half
+
+    return SplitResult(left=left_page, right=right_page, split_x=split_x)
+
+
 def split_spread(image: np.ndarray, overlap: int, centre_tolerance: int = 0) -> SplitResult:
     """Split a double-page spread *image* into two halves with *overlap* pixels.
 
@@ -311,19 +333,15 @@ def split_spread(image: np.ndarray, overlap: int, centre_tolerance: int = 0) -> 
     if not has_gutter:
         split_x = centre
 
-    split_x = int(np.clip(split_x, 0, width - 1))
+    return _build_split_result(colour, split_x, overlap)
 
-    overlap = max(0, int(overlap))
-    left_end = min(width, split_x + overlap)
-    right_start = max(0, split_x - overlap)
 
-    left_page = colour[:, :left_end]
-    right_page = colour[:, right_start:]
+def split_with_fixed_position(image: np.ndarray, split_x: int, overlap: int) -> SplitResult:
+    """Split ``image`` using an explicitly supplied ``split_x`` gutter."""
 
-    if left_page.size == 0 or right_page.size == 0:
-        half = width // 2
-        left_page = colour[:, :half]
-        right_page = colour[:, half:]
-        split_x = half
+    if image.ndim == 2:
+        colour = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    else:
+        colour = image
 
-    return SplitResult(left=left_page, right=right_page, split_x=split_x)
+    return _build_split_result(colour, split_x, overlap)
