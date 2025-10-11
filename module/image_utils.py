@@ -79,6 +79,59 @@ def apply_border(image: np.ndarray, border_px: int, color: Tuple[int, int, int] 
 
 
 @dataclass(frozen=True)
+class BoundingBox:
+    """Axis-aligned rectangle represented by its corner coordinates."""
+
+    left: int
+    top: int
+    right: int
+    bottom: int
+
+    @property
+    def width(self) -> int:
+        return max(0, self.right - self.left)
+
+    @property
+    def height(self) -> int:
+        return max(0, self.bottom - self.top)
+
+    def expand(self, image_shape: tuple[int, ...], pad_x: int, pad_y: int) -> "BoundingBox":
+        """Return a new box enlarged by *pad_x*/*pad_y* pixels and clamped to the image."""
+
+        height, width = image_shape[:2]
+        pad_x = max(0, int(pad_x))
+        pad_y = max(0, int(pad_y))
+
+        left = max(0, self.left - pad_x)
+        top = max(0, self.top - pad_y)
+        right = min(width, self.right + pad_x)
+        bottom = min(height, self.bottom + pad_y)
+
+        if left >= right or top >= bottom:
+            return self
+
+        return BoundingBox(left=left, top=top, right=right, bottom=bottom)
+
+
+def detect_content_bounds(gray: np.ndarray) -> BoundingBox | None:
+    """Detect the main document bounds within the grayscale image *gray*."""
+
+    if gray.ndim != 2:
+        raise ValueError("detect_content_bounds expects a single channel image")
+
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+
+    contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(contour)
+    return BoundingBox(left=x, top=y, right=x + w, bottom=y + h)
+
+
+@dataclass(frozen=True)
 class SplitResult:
     left: np.ndarray
     right: np.ndarray
@@ -127,7 +180,19 @@ def split_spread(image: np.ndarray, overlap: int) -> SplitResult:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     height, width = gray.shape
-    split_x = find_split_column(gray)
+
+    bounds = detect_content_bounds(gray)
+    if bounds and bounds.width > 0 and bounds.height > 0:
+        crop = gray[bounds.top : bounds.bottom, bounds.left : bounds.right]
+        if crop.size:
+            local_split = find_split_column(crop)
+            split_x = bounds.left + local_split
+        else:
+            split_x = find_split_column(gray)
+    else:
+        split_x = find_split_column(gray)
+
+    split_x = int(np.clip(split_x, 0, width - 1))
 
     overlap = max(0, int(overlap))
     left_end = min(width, split_x + overlap)

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import cv2
 
-from .image_utils import apply_border, iter_image_files, load_image, save_with_dpi
+from .image_utils import detect_content_bounds, iter_image_files, load_image, save_with_dpi
 
 
 def initRemoveBorder(self):
@@ -40,40 +40,26 @@ def removeBorder(self, file_path: Path) -> str | None:
 
     height, width = image.shape[:2]
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
+    bounds = detect_content_bounds(gray)
+    if bounds is None:
         save_path = target_dir / relative.name
         save_with_dpi(image, save_path, self.dpi)
         return str(save_path)
-
-    contour = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(contour)
 
     # If the detected area is suspiciously small, keep the original image.
-    if w / width < self.kf_w or h / height < self.kf_h:
+    if bounds.width / width < self.kf_w or bounds.height / height < self.kf_h:
         save_path = target_dir / relative.name
         save_with_dpi(image, save_path, self.dpi)
         return str(save_path)
 
-    margin = self.border_px if self.isAddBorderForAll else 0
-    left = max(0, x + margin)
-    top = max(0, y + margin)
-    right = min(width, x + w - margin)
-    bottom = min(height, y + h - margin)
+    pad_x = self.border_px if self.isAddBorder else 0
+    pad_y = self.border_px if self.isAddBorder and self.isAddBorderForAll else 0
+    expanded = bounds.expand(image.shape, pad_x, pad_y)
 
-    if left >= right or top >= bottom:
-        # fallback to the detected bounding box when the margin is too large
-        left, top, right, bottom = x, y, x + w, y + h
+    if expanded.width <= 0 or expanded.height <= 0:
+        expanded = bounds
 
-    cropped = image[top:bottom, left:right]
-
-    if self.isAddBorder:
-        padded = apply_border(cropped, self.border_px)
-    else:
-        padded = cropped
+    padded = image[expanded.top : expanded.bottom, expanded.left : expanded.right]
 
     save_path = target_dir / relative.name
     save_with_dpi(padded, save_path, self.dpi)
