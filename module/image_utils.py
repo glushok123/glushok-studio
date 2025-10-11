@@ -202,34 +202,77 @@ class SplitResult:
     split_x: int
 
 
-def find_split_column(gray: np.ndarray, window_ratio: float = 0.08) -> int:
+def _project_text_density(gray: np.ndarray) -> np.ndarray:
+    """Return text density projection for each column of ``gray`` image.
+
+    The helper binarises the image and counts how many dark (text) pixels are in
+    each column.  Low values indicate blank space such as the gutter.
+    """
+
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, binary = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    white_ratio = cv2.countNonZero(binary) / max(1, gray.size)
+    if white_ratio < 0.5:
+        binary = cv2.bitwise_not(binary)
+
+    text_mask = 255 - binary
+    projection = text_mask.mean(axis=0)
+    return projection
+
+
+def find_split_column(
+    gray: np.ndarray,
+    window_ratio: float = 0.08,
+    search_radius: int | None = None,
+) -> tuple[int, bool]:
     """Detect the most probable gutter position for a spread ``gray`` image.
 
-    The algorithm projects pixel intensities along the X axis and searches for
-    the lightest column close to the centre.  It proved to be far more stable
-    than the old custom heuristics and never returns an index outside the image
-    bounds.
+    Returns a tuple ``(position, is_confident)``.  When ``is_confident`` is
+    ``False`` the caller should ignore the detected position and fall back to a
+    neutral split (for example the physical centre of the image).
     """
-    height, width = gray.shape
-    projection = gray.mean(axis=0)
+
+    _, width = gray.shape
+    projection = _project_text_density(gray)
+
     window = max(3, int(width * window_ratio) | 1)
     kernel = np.ones(window, dtype=np.float32) / window
     smoothed = np.convolve(projection, kernel, mode="same")
 
     centre = width // 2
-    radius = max(width // 6, window)
+    if search_radius is None or search_radius <= 0:
+        radius = max(width // 6, window)
+    else:
+        radius = max(window, int(search_radius))
+
     start = max(0, centre - radius)
     end = min(width, centre + radius)
-    if start >= end:
-        return centre
+    if end - start <= 1:
+        return centre, False
 
     slice_projection = smoothed[start:end]
     local_index = int(np.argmin(slice_projection))
     split_x = start + local_index
-    return int(np.clip(split_x, 0, width - 1))
+
+    local_min = float(slice_projection[local_index])
+    local_mean = float(slice_projection.mean())
+    local_std = float(slice_projection.std())
+
+    deviation = local_mean - local_min
+    relative_drop = deviation / (local_mean + 1e-6)
+    z_score = deviation / (local_std + 1e-6) if local_std > 1e-6 else 0.0
+
+    is_confident = (
+        local_min <= 5.0
+        or relative_drop >= 0.3
+        or z_score >= 1.0
+    )
+
+    return int(np.clip(split_x, 0, width - 1)), bool(is_confident)
 
 
-def split_spread(image: np.ndarray, overlap: int) -> SplitResult:
+def split_spread(image: np.ndarray, overlap: int, centre_tolerance: int = 0) -> SplitResult:
     """Split a double-page spread *image* into two halves with *overlap* pixels.
 
     The function keeps the pages symmetric: both parts contain the shared
@@ -245,16 +288,28 @@ def split_spread(image: np.ndarray, overlap: int) -> SplitResult:
 
     height, width = gray.shape
 
+    search_radius = max(0, int(centre_tolerance)) if centre_tolerance else None
+
     bounds = detect_content_bounds(gray)
+    split_x = width // 2
+    has_gutter = False
+
     if bounds and bounds.width > 0 and bounds.height > 0:
         crop = gray[bounds.top : bounds.bottom, bounds.left : bounds.right]
         if crop.size:
-            local_split = find_split_column(crop)
+            local_split, has_gutter = find_split_column(crop, search_radius=search_radius)
             split_x = bounds.left + local_split
-        else:
-            split_x = find_split_column(gray)
-    else:
-        split_x = find_split_column(gray)
+    if not has_gutter:
+        split_x_candidate, has_gutter = find_split_column(gray, search_radius=search_radius)
+        split_x = split_x_candidate if has_gutter else split_x
+
+    centre = width // 2
+    tolerance = max(0, int(centre_tolerance))
+    if tolerance and abs(split_x - centre) > tolerance:
+        has_gutter = False
+
+    if not has_gutter:
+        split_x = centre
 
     split_x = int(np.clip(split_x, 0, width - 1))
 

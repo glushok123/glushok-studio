@@ -77,7 +77,7 @@ def parseImage(self, file_path: Path) -> str | None:
         return str(save_path)
 
     try:
-        spread = split_spread(image, self.width_px)
+        spread = split_spread(image, self.width_px, self.pxMediumVal)
     except Exception as exc:
         print(f"[WARN] Не удалось разделить {file_path}: {exc}")
         save_path = target_dir / relative.name
