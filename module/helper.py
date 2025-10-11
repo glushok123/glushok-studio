@@ -42,6 +42,7 @@ def setParamsUi(self):
     self.count_cpu = int(self.cpuSpinBox.value())
     self.isRemoveBorder = self.checkBox.isChecked()  # удалять черную рамку
     self.isSplit = self.checkBox_3.isChecked()  # Делить изображение по полам
+    self.isManualSplitAdjust = self.checkBox_9.isChecked()  # Ручная корректировка середины
     self.isAddBorder = self.checkBox_2.isChecked()  # Добавлять черную рамку
     self.isAddBorderForAll = self.checkBox_4.isChecked()  # Добавлять черную рамку c 4 сторон
     self.isPxIdentically = self.checkBox_5.isChecked()  # Подстраивать разрешение

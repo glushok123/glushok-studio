@@ -11,6 +11,7 @@ class ThreadStart(QThread):
     log = pyqtSignal(str)
     proc = pyqtSignal(int)
     end = pyqtSignal(str)
+    manualAdjustmentRequested = pyqtSignal(object)
 
     def __init__(self,
                  name,
@@ -24,6 +25,7 @@ class ThreadStart(QThread):
                  count_cpu,
                  isRemoveBorder,
                  isSplit,
+                 isManualSplitAdjust,
                  isAddBorder,
                  isAddBorderForAll,
                  isPxIdentically,
@@ -43,6 +45,7 @@ class ThreadStart(QThread):
         self.count_cpu = count_cpu
         self.isRemoveBorder = isRemoveBorder
         self.isSplit = isSplit
+        self.isManualSplitAdjust = isManualSplitAdjust
         self.isAddBorder = isAddBorder
         self.isAddBorderForAll = isAddBorderForAll
         self.isPxIdentically = isPxIdentically

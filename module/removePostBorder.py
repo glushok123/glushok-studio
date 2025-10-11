@@ -6,7 +6,13 @@ from pathlib import Path
 
 import cv2
 
-from .image_utils import detect_content_bounds, iter_image_files, load_image, save_with_dpi
+from .image_utils import (
+    crop_to_content,
+    detect_content_bounds,
+    iter_image_files,
+    load_image,
+    save_with_dpi,
+)
 
 
 def initRemovePostBorder(self):
@@ -46,13 +52,11 @@ def removePostBorder(self, file_path: Path) -> str | None:
         return str(save_path)
 
     pad_x = self.border_px if self.isAddBorder else 0
-    pad_y = self.border_px if self.isAddBorder and self.isAddBorderForAll else 0
-    expanded = bounds.expand(image.shape, pad_x, pad_y)
+    pad_y = self.border_px if self.isAddBorder else 0
 
-    if expanded.width <= 0 or expanded.height <= 0:
-        expanded = bounds
-
-    cropped = image[expanded.top : expanded.bottom, expanded.left : expanded.right]
+    cropped, _ = crop_to_content(image, pad_x=pad_x, pad_y=pad_y, bounds=bounds)
+    if cropped is None:
+        cropped = image
 
     save_path = target_dir / relative.name
     save_with_dpi(cropped, save_path, self.dpi)
