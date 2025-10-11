@@ -1,47 +1,25 @@
-# -*- coding: utf-8 -*-
-import os
-from PIL import Image, ImageOps
-from multiprocessing import cpu_count
-from multiprocessing.pool import ThreadPool
+"""Add a uniform black frame around processed pages."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from .image_utils import apply_border, iter_image_files, load_image, save_with_dpi
 
 
 def initAddBorder(self):
-    _, _, files = next(os.walk(self.fileurl))
+    source_dir = Path(self.fileurl)
+    files = iter_image_files(source_dir)
     self.countFile = len(files)
-    if not os.path.exists(self.directoryName):
-        os.makedirs(self.directoryName)
 
-    dirName = self.fileurl
-    listOfFiles = list()
+    if not files:
+        return
 
-    for (dirpath, dirnames, filenames) in os.walk(dirName):
-        listOfFiles += [os.path.join(dirpath, file) for file in filenames]
-
-    t = ThreadPool(processes=self.count_cpu)
-    rs = t.map(self.addBorder, listOfFiles)
-    t.close()
+    for file_path in files:
+        self.addBorder(file_path)
 
 
-def addBorder(self, filename):
-    filename = filename.replace('\\', '/')
-    filename = filename.replace(str(self.fileurl), '')
-    array = filename.split("/")
-    urlDir = filename.replace(array[-1], '')
-
-    if not os.path.exists(self.directoryName + urlDir):
-        os.makedirs(self.directoryName + urlDir)
-
-    path = self.directoryName
-    os.makedirs(path, exist_ok=True)
-
-    color = "black"
-    top = self.border_px
-    right = self.border_px
-    bottom = self.border_px
-    left = self.border_px
-    border = (int(top), int(right), int(bottom), int(left))
-
-    img = Image.open(self.fileurl + filename)
-
-    new_img = ImageOps.expand(img, border=border, fill=color)
-    new_img.save(self.fileurl + filename, dpi=(self.dpi, self.dpi))
+def addBorder(self, file_path: Path):
+    file_path = Path(file_path)
+    image = load_image(file_path)
+    bordered = apply_border(image, self.border_px)
+    save_with_dpi(bordered, file_path, self.dpi)

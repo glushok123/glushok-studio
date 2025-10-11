@@ -14,54 +14,279 @@
    <string>Glushok Image</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QWidget {
-  background-color: #fff;
+   <string notr="true">QMainWindow#MainWindow {
+    background-color: #050b16;
+    color: #c8d7ff;
+    font-family: "Montserrat";
 }
+
+QWidget {
+    background-color: transparent;
+    color: #c8d7ff;
+    font-family: "Montserrat";
+    font-size: 11pt;
+}
+
 QLabel {
-  color: #464d55;
-font-size: 16px;
-  font-weight: 700;
+    color: #7df9ff;
+    letter-spacing: 0.08em;
+    font-weight: 600;
 }
+
 QLabel#heading {
-  color: #0f1925;
-  font-size: 18px;
-  margin-bottom: 10px;
+    font-size: 16pt;
+    text-transform: uppercase;
+    color: #ff71ff;
 }
 
-QLabel#subheading {
-  color: #0f1925;
-  font-size: 14px;
-  font-weight: normal;
-  margin-bottom: 10px;
-}
-QTextEdit {
-  border-radius: 8px;
-  border: 1px solid #e0e4e7;
-
-}
-
-QTextEdit:focus {
-  border: 1px solid #d0e3ff;
+QTextEdit,
+QLineEdit,
+QListWidget,
+QProgressBar {
+    background-color: rgba(9, 17, 34, 0.9);
+    border: 1px solid #1b6cff;
+    border-radius: 8px;
+    color: #e0f1ff;
+    padding: 6px;
 }
 
-QLineEdit::placeholder {
-  color: #767e89;
+QTextEdit:focus,
+QLineEdit:focus,
+QListWidget:focus {
+    border-color: #ff71ff;
+    box-shadow: 0 0 16px rgba(125, 249, 255, 0.35);
 }
+
+QCheckBox {
+    spacing: 8px;
+    font-weight: 500;
+}
+
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 2px solid #1b6cff;
+    background: rgba(8, 15, 30, 0.9);
+}
+
+QCheckBox::indicator:checked {
+    background: qradialgradient(cx:0.5, cy:0.5, radius:0.6, fx:0.5, fy:0.5,
+                                 stop:0 #1b6cff, stop:1 #7df9ff);
+    border-color: #7df9ff;
+}
+
 QPushButton {
-  background-color: #0d6efd;
-  color: #fff;
-  font-weight: 600;
-  border-radius: 8px;
-  border: 1px solid #0d6efd;
-  padding: 5px 15px;
-  margin-top: 10px;
-  outline: 0px;
+    background-color: rgba(11, 28, 60, 0.85);
+    border: 2px solid #ff71ff;
+    border-radius: 10px;
+    padding: 8px 18px;
+    font-weight: 700;
+    color: #7df9ff;
+    text-transform: uppercase;
 }
-QPushButton:hover,
-QPushButton:focus {
-  background-color: #0b5ed7;
-  border: 3px solid #9ac3fe;
-}</string>
+
+QPushButton:hover {
+    border-color: #7df9ff;
+    color: #ff71ff;
+}
+
+QPushButton:pressed {
+    background-color: #0a1a3f;
+}
+
+QProgressBar {
+    text-align: center;
+    color: #050b16;
+    font-weight: 600;
+}
+
+QProgressBar::chunk {
+    background-color: #7df9ff;
+}
+
+QListWidget::item:selected {
+    background: rgba(255, 113, 255, 0.35);
+    border-left: 3px solid #ff71ff;
+    color: #050b16;
+}
+
+QMenuBar {
+    background-color: #050b16;
+    color: #7df9ff;
+}
+
+QMenuBar::item:selected {
+    background: rgba(125, 249, 255, 0.2);
+}
+
+QStatusBar {
+    background-color: transparent;
+    color: #7df9ff;
+}
+
+QScrollBar:vertical {
+    background: rgba(5, 11, 22, 0.8);
+    width: 12px;
+    margin: 12px 0 12px 0;
+    border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+    background: #1b6cff;
+    min-height: 20px;
+    border-radius: 6px;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: none;
+}
+
+QGroupBox {
+    border: 1px solid rgba(125, 249, 255, 0.4);
+    border-radius: 12px;
+    margin-top: 18px;
+    padding: 12px;
+    background: rgba(9, 16, 32, 0.6);
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 6px;
+    color: #ff71ff;
+}
+
+QLCDNumber {
+    background-color: rgba(11, 28, 60, 0.85);
+    color: #7df9ff;
+    border: 2px solid #1b6cff;
+    border-radius: 8px;
+}
+
+QTabWidget::pane {
+    border: 1px solid #1b6cff;
+    background: rgba(5, 11, 22, 0.6);
+}
+
+QTabBar::tab {
+    background: rgba(5, 11, 22, 0.8);
+    color: #7df9ff;
+    padding: 6px 16px;
+    border: 1px solid #1b6cff;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+QTabBar::tab:selected {
+    background: rgba(255, 113, 255, 0.35);
+    color: #050b16;
+}
+
+QHeaderView::section {
+    background: rgba(5, 11, 22, 0.8);
+    color: #7df9ff;
+    border: 1px solid #1b6cff;
+}
+
+QToolTip {
+    background: rgba(255, 113, 255, 0.9);
+    color: #050b16;
+    border: 1px solid #7df9ff;
+    padding: 6px;
+}
+
+QSplitter::handle {
+    background: rgba(27, 108, 255, 0.4);
+}
+
+QFrame#neonFrame {
+    border: 1px solid rgba(125, 249, 255, 0.35);
+    border-radius: 16px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                               stop:0 rgba(11, 28, 60, 0.85),
+                               stop:1 rgba(68, 16, 74, 0.85));
+}
+
+QGraphicsView {
+    border: 1px solid rgba(125, 249, 255, 0.35);
+    border-radius: 12px;
+    background: rgba(5, 11, 22, 0.8);
+}
+
+QSlider::groove:horizontal {
+    height: 6px;
+    background: rgba(27, 108, 255, 0.25);
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    width: 14px;
+    margin: -4px 0;
+    border-radius: 7px;
+    background: #ff71ff;
+    border: 1px solid #7df9ff;
+}
+
+QSpinBox,
+QComboBox {
+    background-color: rgba(9, 17, 34, 0.9);
+    border: 1px solid #1b6cff;
+    border-radius: 8px;
+    padding: 4px 8px;
+    color: #e0f1ff;
+}
+
+QComboBox::drop-down {
+    border: none;
+}
+
+QComboBox QAbstractItemView {
+    background: rgba(5, 11, 22, 0.95);
+    color: #7df9ff;
+    selection-background-color: rgba(255, 113, 255, 0.35);
+}
+
+QToolButton {
+    background-color: rgba(11, 28, 60, 0.75);
+    border: 1px solid rgba(125, 249, 255, 0.45);
+    border-radius: 8px;
+    color: #7df9ff;
+}
+
+QToolButton:hover {
+    border-color: #ff71ff;
+    color: #ff71ff;
+}
+
+QPlainTextEdit {
+    background-color: rgba(9, 17, 34, 0.9);
+    border: 1px solid #1b6cff;
+    border-radius: 8px;
+    color: #e0f1ff;
+    padding: 6px;
+}
+
+QPlainTextEdit:focus {
+    border-color: #ff71ff;
+}
+
+QDockWidget::title {
+    background: rgba(11, 28, 60, 0.85);
+    padding: 4px;
+    color: #7df9ff;
+}
+
+QTableWidget {
+    gridline-color: rgba(125, 249, 255, 0.35);
+}
+
+QTableWidget QTableCornerButton::section {
+    background: rgba(5, 11, 22, 0.8);
+    border: 1px solid #1b6cff;
+}
+   </string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout">
@@ -82,9 +307,6 @@ QPushButton:focus {
     </property>
     <item row="1" column="3">
      <widget class="QCheckBox" name="checkBox_6">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Показывать изначальные сканы</string>
       </property>
@@ -106,10 +328,6 @@ QPushButton:focus {
       </property>
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;
-color: rgb(0, 0, 0);</string>
       </property>
       <property name="readOnly">
        <bool>false</bool>
@@ -153,10 +371,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
       </property>
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;
-color: rgb(0, 0, 0);</string>
-      </property>
       <property name="readOnly">
        <bool>false</bool>
       </property>
@@ -174,9 +388,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="8" column="3">
      <widget class="QCheckBox" name="checkBox_4">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Рамка с 4 сторон</string>
       </property>
@@ -214,9 +425,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="9" column="3">
      <widget class="QCheckBox" name="checkBox_5">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Одинаковое разрешение</string>
       </property>
@@ -267,9 +475,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <height>40</height>
        </size>
       </property>
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="text">
        <string>Кол. px для нахлеста</string>
       </property>
@@ -277,9 +482,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="4" column="3">
      <widget class="QCheckBox" name="checkBox_3">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Делить изображение по полам</string>
       </property>
@@ -290,9 +492,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="6" column="3">
      <widget class="QCheckBox" name="checkBox_2">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Добавлять черную рамку(ОБРЕЗКА)</string>
       </property>
@@ -322,9 +521,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="5" column="0">
      <widget class="QLabel" name="label_4">
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="text">
        <string>Кол. px для добавление рамки</string>
       </property>
@@ -332,9 +528,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="7" column="3">
      <widget class="QCheckBox" name="checkBox_8">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Добавлять черную рамку (ЧЕРНЫЙ ФОН)</string>
       </property>
@@ -342,9 +535,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="8" column="0">
      <widget class="QLabel" name="label_7">
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="text">
        <string>Кол. px для обнаружения середины листа</string>
       </property>
@@ -352,9 +542,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="5" column="3">
      <widget class="QCheckBox" name="checkBox">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Удалять черную рамку</string>
       </property>
@@ -396,9 +583,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
       </property>
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="styleSheet">
-       <string notr="true"/>
       </property>
       <property name="readOnly">
        <bool>false</bool>
@@ -495,10 +679,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
               <height>16777215</height>
              </size>
             </property>
-            <property name="styleSheet">
-             <string notr="true">background-color: rgb(0, 0, 0);
-color: rgb(0, 255, 0);</string>
-            </property>
            </widget>
           </item>
          </layout>
@@ -537,9 +717,6 @@ color: rgb(0, 255, 0);</string>
     </item>
     <item row="2" column="3">
      <widget class="QCheckBox" name="checkBox_7">
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
-      </property>
       <property name="text">
        <string>Показывать Готовые сканы</string>
       </property>
@@ -561,10 +738,6 @@ color: rgb(0, 255, 0);</string>
       </property>
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;
-color: rgb(0, 0, 0);</string>
       </property>
       <property name="readOnly">
        <bool>false</bool>
@@ -593,9 +766,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
     </item>
     <item row="6" column="0">
      <widget class="QLabel" name="label_5">
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="text">
        <string>DPI</string>
       </property>
@@ -622,10 +792,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
       <property name="layoutDirection">
        <enum>Qt::LeftToRight</enum>
       </property>
-      <property name="styleSheet">
-       <string notr="true">font: 75 10pt &quot;MS Shell Dlg 2&quot;;
-color: rgb(0, 0, 0);</string>
-      </property>
       <property name="readOnly">
        <bool>false</bool>
       </property>
@@ -649,10 +815,6 @@ li.checked::marker { content: &quot;\2612&quot;; }
         <height>40</height>
        </size>
       </property>
-      <property name="styleSheet">
-       <string notr="true">background-color: rgb(255, 0, 0);
-color: rgb(255, 255, 255);</string>
-      </property>
       <property name="text">
        <string>ВЫПОЛНИТЬ</string>
       </property>
@@ -660,9 +822,6 @@ color: rgb(255, 255, 255);</string>
     </item>
     <item row="1" column="0">
      <widget class="QLabel" name="label_2">
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="text">
        <string>Количество файлов в папке:</string>
       </property>
@@ -689,9 +848,6 @@ color: rgb(255, 255, 255);</string>
         <height>30</height>
        </size>
       </property>
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="text">
        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:16pt;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
       </property>
@@ -699,9 +855,6 @@ color: rgb(255, 255, 255);</string>
     </item>
     <item row="7" column="0">
      <widget class="QLabel" name="label_6">
-      <property name="styleSheet">
-       <string notr="true"/>
-      </property>
       <property name="text">
        <string>Кол. px для обнаружения начала листа</string>
       </property>
