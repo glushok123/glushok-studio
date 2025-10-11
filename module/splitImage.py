@@ -4,7 +4,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .image_utils import iter_image_files, load_image, save_with_dpi, split_spread
+from .image_utils import crop_to_content, iter_image_files, load_image, save_with_dpi, split_spread
 
 
 def initSplitImage(self):
@@ -62,6 +62,13 @@ def parseImage(self, file_path: Path) -> str | None:
     target_dir.mkdir(parents=True, exist_ok=True)
 
     image = load_image(file_path)
+
+    if getattr(self, "isRemoveBorder", False):
+        pad = self.border_px if getattr(self, "isAddBorder", False) else 0
+        cropped, _ = crop_to_content(image, pad_x=pad, pad_y=pad)
+        if cropped is not None:
+            image = cropped
+
     height, width = image.shape[:2]
 
     if height >= width:
@@ -70,7 +77,7 @@ def parseImage(self, file_path: Path) -> str | None:
         return str(save_path)
 
     try:
-        spread = split_spread(image, self.width_px)
+        spread = split_spread(image, self.width_px, self.pxMediumVal)
     except Exception as exc:
         print(f"[WARN] Не удалось разделить {file_path}: {exc}")
         save_path = target_dir / relative.name
