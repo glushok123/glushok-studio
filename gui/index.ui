@@ -6,857 +6,664 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1417</width>
-    <height>969</height>
+    <width>1360</width>
+    <height>900</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Glushok Image</string>
+   <string>Glushok Studio</string>
   </property>
   <property name="styleSheet">
    <string notr="true">QMainWindow#MainWindow {
-    background-color: #050b16;
-    color: #c8d7ff;
-    font-family: "Montserrat";
-}
-
-QWidget {
-    background-color: transparent;
-    color: #c8d7ff;
-    font-family: "Montserrat";
+    background-color: #0d1628;
+    color: #e5ecff;
+    font-family: "Inter";
     font-size: 11pt;
 }
 
 QLabel {
-    color: #7df9ff;
-    letter-spacing: 0.08em;
-    font-weight: 600;
+    color: #c7d7ff;
+    font-weight: 500;
+    letter-spacing: 0.03em;
 }
 
 QLabel#heading {
-    font-size: 16pt;
-    text-transform: uppercase;
-    color: #ff71ff;
+    font-size: 20pt;
+    font-weight: 700;
+    color: #7ad7ff;
+    letter-spacing: 0.12em;
 }
 
-QTextEdit,
-QLineEdit,
-QListWidget,
-QProgressBar {
-    background-color: rgba(9, 17, 34, 0.9);
-    border: 1px solid #1b6cff;
-    border-radius: 8px;
-    color: #e0f1ff;
-    padding: 6px;
+QGroupBox {
+    border: 1px solid rgba(122, 215, 255, 0.35);
+    border-radius: 14px;
+    background-color: rgba(19, 30, 54, 0.85);
+    padding: 14px;
+    margin-top: 18px;
 }
 
-QTextEdit:focus,
-QLineEdit:focus,
-QListWidget:focus {
-    border-color: #ff71ff;
-    box-shadow: 0 0 16px rgba(125, 249, 255, 0.35);
+QGroupBox::title {
+    color: #8d9eff;
+    font-weight: 600;
+    padding: 0 8px;
+}
+
+QFrame#contentFrame, QFrame#controlPanel, QFrame#previewPanel {
+    background: rgba(10, 20, 36, 0.0);
+    border: none;
+}
+
+QSpinBox, QDoubleSpinBox, QLineEdit {
+    background: rgba(11, 21, 38, 0.92);
+    border: 1px solid rgba(122, 215, 255, 0.45);
+    border-radius: 10px;
+    padding: 6px 10px;
+    color: #f4f7ff;
+}
+
+QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {
+    border-color: #7ad7ff;
+    box-shadow: 0 0 12px rgba(122, 215, 255, 0.25);
 }
 
 QCheckBox {
     spacing: 8px;
     font-weight: 500;
+    color: #c7d7ff;
 }
 
 QCheckBox::indicator {
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
-    border: 2px solid #1b6cff;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 2px solid rgba(122, 215, 255, 0.6);
     background: rgba(8, 15, 30, 0.9);
 }
 
 QCheckBox::indicator:checked {
-    background: qradialgradient(cx:0.5, cy:0.5, radius:0.6, fx:0.5, fy:0.5,
-                                 stop:0 #1b6cff, stop:1 #7df9ff);
-    border-color: #7df9ff;
+    background-color: #7ad7ff;
+    border-color: #7ad7ff;
 }
 
 QPushButton {
-    background-color: rgba(11, 28, 60, 0.85);
-    border: 2px solid #ff71ff;
-    border-radius: 10px;
-    padding: 8px 18px;
-    font-weight: 700;
-    color: #7df9ff;
+    background-color: #1c2f52;
+    border-radius: 12px;
+    border: 2px solid rgba(122, 215, 255, 0.55);
+    padding: 10px 24px;
+    font-weight: 600;
+    color: #f4f7ff;
     text-transform: uppercase;
 }
 
 QPushButton:hover {
-    border-color: #7df9ff;
-    color: #ff71ff;
+    background-color: #243a63;
+    border-color: #7ad7ff;
+    color: #7ad7ff;
 }
 
 QPushButton:pressed {
-    background-color: #0a1a3f;
+    background-color: #152745;
 }
 
 QProgressBar {
-    text-align: center;
-    color: #050b16;
+    background: rgba(11, 21, 38, 0.92);
+    border-radius: 12px;
+    border: 1px solid rgba(122, 215, 255, 0.35);
+    height: 32px;
+    color: #0d1628;
     font-weight: 600;
 }
 
 QProgressBar::chunk {
-    background-color: #7df9ff;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7ad7ff, stop:1 #8d9eff);
+    border-radius: 10px;
 }
 
-QListWidget::item:selected {
-    background: rgba(255, 113, 255, 0.35);
-    border-left: 3px solid #ff71ff;
-    color: #050b16;
+QTabWidget::pane {
+    border: 1px solid rgba(122, 215, 255, 0.35);
+    border-radius: 12px;
+    background: rgba(11, 21, 38, 0.65);
 }
 
-QMenuBar {
-    background-color: #050b16;
-    color: #7df9ff;
+QTabBar::tab {
+    background: rgba(11, 21, 38, 0.85);
+    padding: 8px 22px;
+    color: #c7d7ff;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border: 1px solid transparent;
+    margin-right: 4px;
 }
 
-QMenuBar::item:selected {
-    background: rgba(125, 249, 255, 0.2);
+QTabBar::tab:selected {
+    background: rgba(122, 215, 255, 0.2);
+    color: #7ad7ff;
+    border-color: rgba(122, 215, 255, 0.45);
 }
 
-QStatusBar {
-    background-color: transparent;
-    color: #7df9ff;
+QListWidget {
+    background: rgba(11, 21, 38, 0.9);
+    border: 1px solid rgba(122, 215, 255, 0.35);
+    border-radius: 12px;
+    padding: 8px;
+}
+
+QTextEdit {
+    background: rgba(11, 21, 38, 0.9);
+    border: 1px solid rgba(122, 215, 255, 0.35);
+    border-radius: 12px;
+    padding: 10px;
+    color: #f4f7ff;
 }
 
 QScrollBar:vertical {
-    background: rgba(5, 11, 22, 0.8);
+    background: rgba(11, 21, 38, 0.8);
     width: 12px;
-    margin: 12px 0 12px 0;
+    margin: 4px;
     border-radius: 6px;
 }
 
 QScrollBar::handle:vertical {
-    background: #1b6cff;
-    min-height: 20px;
+    background: #7ad7ff;
     border-radius: 6px;
 }
 
-QScrollBar::add-line:vertical,
-QScrollBar::sub-line:vertical {
-    background: none;
+QMenuBar {
+    background: transparent;
+    color: #c7d7ff;
 }
 
-QGroupBox {
-    border: 1px solid rgba(125, 249, 255, 0.4);
-    border-radius: 12px;
-    margin-top: 18px;
-    padding: 12px;
-    background: rgba(9, 16, 32, 0.6);
+QMenuBar::item:selected {
+    background: rgba(122, 215, 255, 0.2);
 }
 
-QGroupBox::title {
-    subcontrol-origin: margin;
-    subcontrol-position: top left;
-    padding: 0 6px;
-    color: #ff71ff;
+QStatusBar {
+    background: transparent;
+    color: #7ad7ff;
 }
-
-QLCDNumber {
-    background-color: rgba(11, 28, 60, 0.85);
-    color: #7df9ff;
-    border: 2px solid #1b6cff;
-    border-radius: 8px;
-}
-
-QTabWidget::pane {
-    border: 1px solid #1b6cff;
-    background: rgba(5, 11, 22, 0.6);
-}
-
-QTabBar::tab {
-    background: rgba(5, 11, 22, 0.8);
-    color: #7df9ff;
-    padding: 6px 16px;
-    border: 1px solid #1b6cff;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-}
-
-QTabBar::tab:selected {
-    background: rgba(255, 113, 255, 0.35);
-    color: #050b16;
-}
-
-QHeaderView::section {
-    background: rgba(5, 11, 22, 0.8);
-    color: #7df9ff;
-    border: 1px solid #1b6cff;
-}
-
-QToolTip {
-    background: rgba(255, 113, 255, 0.9);
-    color: #050b16;
-    border: 1px solid #7df9ff;
-    padding: 6px;
-}
-
-QSplitter::handle {
-    background: rgba(27, 108, 255, 0.4);
-}
-
-QFrame#neonFrame {
-    border: 1px solid rgba(125, 249, 255, 0.35);
-    border-radius: 16px;
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                               stop:0 rgba(11, 28, 60, 0.85),
-                               stop:1 rgba(68, 16, 74, 0.85));
-}
-
-QGraphicsView {
-    border: 1px solid rgba(125, 249, 255, 0.35);
-    border-radius: 12px;
-    background: rgba(5, 11, 22, 0.8);
-}
-
-QSlider::groove:horizontal {
-    height: 6px;
-    background: rgba(27, 108, 255, 0.25);
-    border-radius: 3px;
-}
-
-QSlider::handle:horizontal {
-    width: 14px;
-    margin: -4px 0;
-    border-radius: 7px;
-    background: #ff71ff;
-    border: 1px solid #7df9ff;
-}
-
-QSpinBox,
-QComboBox {
-    background-color: rgba(9, 17, 34, 0.9);
-    border: 1px solid #1b6cff;
-    border-radius: 8px;
-    padding: 4px 8px;
-    color: #e0f1ff;
-}
-
-QComboBox::drop-down {
-    border: none;
-}
-
-QComboBox QAbstractItemView {
-    background: rgba(5, 11, 22, 0.95);
-    color: #7df9ff;
-    selection-background-color: rgba(255, 113, 255, 0.35);
-}
-
-QToolButton {
-    background-color: rgba(11, 28, 60, 0.75);
-    border: 1px solid rgba(125, 249, 255, 0.45);
-    border-radius: 8px;
-    color: #7df9ff;
-}
-
-QToolButton:hover {
-    border-color: #ff71ff;
-    color: #ff71ff;
-}
-
-QPlainTextEdit {
-    background-color: rgba(9, 17, 34, 0.9);
-    border: 1px solid #1b6cff;
-    border-radius: 8px;
-    color: #e0f1ff;
-    padding: 6px;
-}
-
-QPlainTextEdit:focus {
-    border-color: #ff71ff;
-}
-
-QDockWidget::title {
-    background: rgba(11, 28, 60, 0.85);
-    padding: 4px;
-    color: #7df9ff;
-}
-
-QTableWidget {
-    gridline-color: rgba(125, 249, 255, 0.35);
-}
-
-QTableWidget QTableCornerButton::section {
-    background: rgba(5, 11, 22, 0.8);
-    border: 1px solid #1b6cff;
-}
-   </string>
+</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout">
+   <layout class="QVBoxLayout" name="mainLayout">
+    <property name="spacing">
+     <number>20</number>
+    </property>
     <property name="leftMargin">
-     <number>10</number>
+     <number>24</number>
     </property>
     <property name="topMargin">
-     <number>8</number>
+     <number>24</number>
     </property>
     <property name="rightMargin">
-     <number>10</number>
+     <number>24</number>
     </property>
     <property name="bottomMargin">
-     <number>15</number>
+     <number>24</number>
     </property>
-    <property name="spacing">
-     <number>9</number>
-    </property>
-    <item row="1" column="3">
-     <widget class="QCheckBox" name="checkBox_6">
+    <item>
+     <widget class="QLabel" name="heading">
       <property name="text">
-       <string>Показывать изначальные сканы</string>
+       <string>GLUSHOK STUDIO · ОБРАБОТКА СКАНОВ</string>
       </property>
-      <property name="checked">
-       <bool>false</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="8" column="1">
-     <widget class="QTextEdit" name="textEdit_6">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>150</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="layoutDirection">
-       <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="readOnly">
-       <bool>false</bool>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:10pt; font-weight:75; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:400;&quot;&gt;450&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      <property name="alignment">
+       <set>Qt::AlignLeft|Qt::AlignVCenter</set>
       </property>
      </widget>
     </item>
-    <item row="10" column="0">
-     <widget class="QLabel" name="label_11">
-      <property name="text">
-       <string>Кф. для высоты (удаление рамки)</string>
-      </property>
+    <item>
+     <widget class="QFrame" name="contentFrame">
+      <layout class="QHBoxLayout" name="contentLayout">
+       <property name="spacing">
+        <number>22</number>
+       </property>
+       <item>
+        <widget class="QFrame" name="controlPanel">
+         <layout class="QVBoxLayout" name="controlLayout">
+          <property name="spacing">
+           <number>16</number>
+          </property>
+          <item>
+           <widget class="QGroupBox" name="sourceGroup">
+            <property name="title">
+             <string>Источник</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayoutSource">
+             <item row="0" column="0">
+              <widget class="QLabel" name="labelPathCaption">
+               <property name="text">
+                <string>Выбранная папка:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLabel" name="label_12">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="minimumHeight">
+                <number>24</number>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="wordWrap">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_2">
+               <property name="text">
+                <string>Количество файлов:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QLabel" name="label">
+               <property name="minimumHeight">
+                <number>30</number>
+               </property>
+               <property name="text">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:18pt;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="processingGroup">
+            <property name="title">
+             <string>Параметры обработки</string>
+            </property>
+            <layout class="QFormLayout" name="formLayout">
+             <property name="horizontalSpacing">
+              <number>14</number>
+             </property>
+             <property name="verticalSpacing">
+              <number>12</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="labelOverlap">
+               <property name="text">
+                <string>Кол. px для нахлёста</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QSpinBox" name="overlapSpinBox">
+               <property name="minimum">
+                <number>0</number>
+               </property>
+               <property name="maximum">
+                <number>2000</number>
+               </property>
+               <property name="value">
+                <number>100</number>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="labelBorder">
+               <property name="text">
+                <string>Кол. px для добавления рамки</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QSpinBox" name="borderSpinBox">
+               <property name="minimum">
+                <number>0</number>
+               </property>
+               <property name="maximum">
+                <number>800</number>
+               </property>
+               <property name="value">
+                <number>50</number>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="labelDpi">
+               <property name="text">
+                <string>DPI</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QSpinBox" name="dpiSpinBox">
+               <property name="minimum">
+                <number>72</number>
+               </property>
+               <property name="maximum">
+                <number>1200</number>
+               </property>
+               <property name="value">
+                <number>400</number>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="labelStart">
+               <property name="text">
+                <string>Кол. px для обнаружения начала листа</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QSpinBox" name="startSearchSpinBox">
+               <property name="minimum">
+                <number>0</number>
+               </property>
+               <property name="maximum">
+                <number>2000</number>
+               </property>
+               <property name="value">
+                <number>300</number>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="labelMiddle">
+               <property name="text">
+                <string>Кол. px для обнаружения середины листа</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QSpinBox" name="middleSearchSpinBox">
+               <property name="minimum">
+                <number>0</number>
+               </property>
+               <property name="maximum">
+                <number>3000</number>
+               </property>
+               <property name="value">
+                <number>450</number>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QLabel" name="labelCpu">
+               <property name="text">
+                <string>Количество потоков</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QSpinBox" name="cpuSpinBox">
+               <property name="minimum">
+                <number>1</number>
+               </property>
+               <property name="maximum">
+                <number>32</number>
+               </property>
+               <property name="value">
+                <number>4</number>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="labelWidthCoef">
+               <property name="text">
+                <string>Кф. для ширины (удаление рамки)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <widget class="QDoubleSpinBox" name="widthCoefSpinBox">
+               <property name="decimals">
+                <number>2</number>
+               </property>
+               <property name="singleStep">
+                <double>0.05</double>
+               </property>
+               <property name="minimum">
+                <double>0.10</double>
+               </property>
+               <property name="maximum">
+                <double>1.00</double>
+               </property>
+               <property name="value">
+                <double>0.60</double>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0">
+              <widget class="QLabel" name="labelHeightCoef">
+               <property name="text">
+                <string>Кф. для высоты (удаление рамки)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1">
+              <widget class="QDoubleSpinBox" name="heightCoefSpinBox">
+               <property name="decimals">
+                <number>2</number>
+               </property>
+               <property name="singleStep">
+                <double>0.05</double>
+               </property>
+               <property name="minimum">
+                <double>0.10</double>
+               </property>
+               <property name="maximum">
+                <double>1.00</double>
+               </property>
+               <property name="value">
+                <double>0.80</double>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="modesGroup">
+            <property name="title">
+             <string>Опции</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayoutModes">
+             <item row="0" column="0">
+              <widget class="QCheckBox" name="checkBox">
+               <property name="text">
+                <string>Удалять черную рамку</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QCheckBox" name="checkBox_4">
+               <property name="text">
+                <string>Рамка с 4 сторон</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QCheckBox" name="checkBox_3">
+               <property name="text">
+                <string>Делить изображение по полам</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QCheckBox" name="checkBox_2">
+               <property name="text">
+                <string>Добавлять черную рамку (ОБРЕЗКА)</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QCheckBox" name="checkBox_8">
+               <property name="text">
+                <string>Добавлять черную рамку (ЧЕРНЫЙ ФОН)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QCheckBox" name="checkBox_5">
+               <property name="text">
+                <string>Одинаковое разрешение</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QCheckBox" name="checkBox_6">
+               <property name="text">
+                <string>Показывать изначальные сканы</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QCheckBox" name="checkBox_7">
+               <property name="text">
+                <string>Показывать готовые сканы</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::Expanding</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton">
+            <property name="minimumHeight">
+             <number>48</number>
+            </property>
+            <property name="text">
+             <string>Выполнить</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="previewPanel">
+         <layout class="QVBoxLayout" name="previewLayout">
+          <property name="spacing">
+           <number>16</number>
+          </property>
+          <item>
+           <widget class="QTabWidget" name="tabWidget">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <widget class="QWidget" name="tabQueue">
+             <attribute name="title">
+              <string>Очередь</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayoutQueue">
+              <item>
+               <widget class="QListWidget" name="folderQueueList"/>
+              </item>
+              <item>
+               <layout class="QHBoxLayout" name="horizontalLayoutQueueButtons">
+                <item>
+                 <widget class="QPushButton" name="addFolderButton">
+                  <property name="text">
+                   <string>Добавить папку</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="removeFolderButton">
+                  <property name="text">
+                   <string>Удалить папку</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabLogs">
+             <attribute name="title">
+              <string>Логи</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="logLayout">
+              <item>
+               <widget class="QTextEdit" name="textEdit"/>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabStartScans">
+             <attribute name="title">
+              <string>Изначальные сканы</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="startLayout">
+              <item>
+               <widget class="QListWidget" name="listWidget"/>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="tabResultScans">
+             <attribute name="title">
+              <string>Результат</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="resultLayout">
+              <item>
+               <widget class="QListWidget" name="listWidget_2"/>
+              </item>
+             </layout>
+            </widget>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_8">
+            <property name="minimumHeight">
+             <number>260</number>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </item>
-    <item row="5" column="1">
-     <widget class="QTextEdit" name="textEdit_3">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>150</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="layoutDirection">
-       <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="readOnly">
-       <bool>false</bool>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:10pt; font-weight:75; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:400;&quot;&gt;50&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="8" column="3">
-     <widget class="QCheckBox" name="checkBox_4">
-      <property name="text">
-       <string>Рамка с 4 сторон</string>
-      </property>
-      <property name="checked">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="4" column="2" rowspan="6">
-     <widget class="Line" name="line">
-      <property name="orientation">
-       <enum>Qt::Vertical</enum>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="0">
-     <widget class="QLabel" name="label_9">
-      <property name="text">
-       <string>Количество потоков:</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="0" colspan="4">
-     <widget class="QLabel" name="label_12">
-      <property name="maximumSize">
-       <size>
-        <width>16777215</width>
-        <height>20</height>
-       </size>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
-    </item>
-    <item row="9" column="3">
-     <widget class="QCheckBox" name="checkBox_5">
-      <property name="text">
-       <string>Одинаковое разрешение</string>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="1">
-     <widget class="QTextEdit" name="textEdit_7">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>16777215</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="font">
-       <font>
-        <pointsize>12</pointsize>
-       </font>
-      </property>
-      <property name="layoutDirection">
-       <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="autoFormatting">
-       <set>QTextEdit::AutoAll</set>
-      </property>
-      <property name="undoRedoEnabled">
-       <bool>true</bool>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Segoe UI'; font-size:12pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'MS Shell Dlg 2';&quot;&gt;4&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="4" column="0">
-     <widget class="QLabel" name="label_3">
-      <property name="maximumSize">
-       <size>
-        <width>16777215</width>
-        <height>40</height>
-       </size>
-      </property>
-      <property name="text">
-       <string>Кол. px для нахлеста</string>
-      </property>
-     </widget>
-    </item>
-    <item row="4" column="3">
-     <widget class="QCheckBox" name="checkBox_3">
-      <property name="text">
-       <string>Делить изображение по полам</string>
-      </property>
-      <property name="checked">
-       <bool>false</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="6" column="3">
-     <widget class="QCheckBox" name="checkBox_2">
-      <property name="text">
-       <string>Добавлять черную рамку(ОБРЕЗКА)</string>
-      </property>
-      <property name="checked">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="11" column="1" colspan="3">
+    <item>
      <widget class="QProgressBar" name="progressBar">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>40</height>
-       </size>
+      <property name="minimum">
+       <number>0</number>
+      </property>
+      <property name="maximum">
+       <number>100</number>
       </property>
       <property name="value">
        <number>0</number>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-     </widget>
-    </item>
-    <item row="5" column="0">
-     <widget class="QLabel" name="label_4">
-      <property name="text">
-       <string>Кол. px для добавление рамки</string>
-      </property>
-     </widget>
-    </item>
-    <item row="7" column="3">
-     <widget class="QCheckBox" name="checkBox_8">
-      <property name="text">
-       <string>Добавлять черную рамку (ЧЕРНЫЙ ФОН)</string>
-      </property>
-     </widget>
-    </item>
-    <item row="8" column="0">
-     <widget class="QLabel" name="label_7">
-      <property name="text">
-       <string>Кол. px для обнаружения середины листа</string>
-      </property>
-     </widget>
-    </item>
-    <item row="5" column="3">
-     <widget class="QCheckBox" name="checkBox">
-      <property name="text">
-       <string>Удалять черную рамку</string>
-      </property>
-      <property name="checked">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="9" column="1">
-     <widget class="QTextEdit" name="textEdit_8">
-      <property name="maximumSize">
-       <size>
-        <width>150</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'MS Shell Dlg 2'; font-size:12pt;&quot;&gt;0.4&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="4" column="1">
-     <widget class="QTextEdit" name="textEdit_2">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>150</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="layoutDirection">
-       <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="readOnly">
-       <bool>false</bool>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'MS Shell Dlg 2'; font-size:12pt;&quot;&gt;100&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="10" column="1">
-     <widget class="QTextEdit" name="textEdit_9">
-      <property name="maximumSize">
-       <size>
-        <width>150</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'MS Shell Dlg 2'; font-size:12pt;&quot;&gt;0.6&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="5" rowspan="15">
-     <widget class="QTabWidget" name="tabWidget">
-      <property name="minimumSize">
-       <size>
-        <width>600</width>
-        <height>0</height>
-       </size>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>400</width>
-        <height>16777215</height>
-       </size>
-      </property>
-      <property name="currentIndex">
-       <number>0</number>
-      </property>
-      <widget class="QWidget" name="tabQueue">
-       <attribute name="title">
-        <string>Очередь обработки</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="verticalLayoutQueue">
-        <item>
-         <widget class="QListWidget" name="folderQueueList"/>
-        </item>
-        <item>
-         <layout class="QHBoxLayout" name="horizontalLayoutQueueButtons">
-          <item>
-           <widget class="QPushButton" name="addFolderButton">
-            <property name="text">
-             <string>Добавить папку</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="removeFolderButton">
-            <property name="text">
-             <string>Удалить папку</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="tab_3">
-       <attribute name="title">
-        <string>ЛОГИ</string>
-       </attribute>
-       <layout class="QGridLayout" name="gridLayout_3">
-        <item row="0" column="0">
-         <layout class="QGridLayout" name="gridLayout_2">
-          <item row="0" column="0">
-           <widget class="QTextEdit" name="textEdit">
-            <property name="maximumSize">
-             <size>
-              <width>16777215</width>
-              <height>16777215</height>
-             </size>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="tab_4">
-       <attribute name="title">
-        <string>Изначальные сканы</string>
-       </attribute>
-       <layout class="QGridLayout" name="gridLayout_5">
-        <item row="0" column="0">
-         <layout class="QGridLayout" name="gridLayout_4">
-          <item row="0" column="0">
-           <widget class="QListWidget" name="listWidget"/>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="tab_5">
-       <attribute name="title">
-        <string>Получилось</string>
-       </attribute>
-       <layout class="QGridLayout" name="gridLayout_7">
-        <item row="0" column="0">
-         <layout class="QGridLayout" name="gridLayout_6">
-          <item row="0" column="0">
-           <widget class="QListWidget" name="listWidget_2"/>
-          </item>
-         </layout>
-        </item>
-       </layout>
-      </widget>
-     </widget>
-    </item>
-    <item row="2" column="3">
-     <widget class="QCheckBox" name="checkBox_7">
-      <property name="text">
-       <string>Показывать Готовые сканы</string>
-      </property>
-      <property name="checked">
-       <bool>false</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="7" column="1">
-     <widget class="QTextEdit" name="textEdit_5">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>150</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="layoutDirection">
-       <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="readOnly">
-       <bool>false</bool>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:10pt; font-weight:75; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:400;&quot;&gt;300&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="12" column="0" rowspan="3" colspan="4">
-     <widget class="QLabel" name="label_8">
-      <property name="text">
-       <string/>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-     </widget>
-    </item>
-    <item row="6" column="0">
-     <widget class="QLabel" name="label_5">
-      <property name="text">
-       <string>DPI</string>
-      </property>
-     </widget>
-    </item>
-    <item row="9" column="0">
-     <widget class="QLabel" name="label_10">
-      <property name="text">
-       <string>Кф. для ширины (удаление рамки)</string>
-      </property>
-     </widget>
-    </item>
-    <item row="6" column="1">
-     <widget class="QTextEdit" name="textEdit_4">
-      <property name="enabled">
-       <bool>true</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>150</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="layoutDirection">
-       <enum>Qt::LeftToRight</enum>
-      </property>
-      <property name="readOnly">
-       <bool>false</bool>
-      </property>
-      <property name="html">
-       <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
-p, li { white-space: pre-wrap; }
-hr { height: 1px; border-width: 0; }
-li.unchecked::marker { content: &quot;\2610&quot;; }
-li.checked::marker { content: &quot;\2612&quot;; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'MS Shell Dlg 2'; font-size:10pt; font-weight:75; font-style:normal;&quot;&gt;
-&lt;p align=&quot;center&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:12pt; font-weight:400;&quot;&gt;400&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="11" column="0">
-     <widget class="QPushButton" name="pushButton">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>40</height>
-       </size>
-      </property>
-      <property name="text">
-       <string>ВЫПОЛНИТЬ</string>
-      </property>
-     </widget>
-    </item>
-    <item row="1" column="0">
-     <widget class="QLabel" name="label_2">
-      <property name="text">
-       <string>Количество файлов в папке:</string>
-      </property>
-     </widget>
-    </item>
-    <item row="3" column="0" colspan="4">
-     <widget class="Line" name="line_2">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-     </widget>
-    </item>
-    <item row="1" column="1">
-     <widget class="QLabel" name="label">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>0</height>
-       </size>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>16777215</width>
-        <height>30</height>
-       </size>
-      </property>
-      <property name="text">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:16pt;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-     </widget>
-    </item>
-    <item row="7" column="0">
-     <widget class="QLabel" name="label_6">
-      <property name="text">
-       <string>Кол. px для обнаружения начала листа</string>
       </property>
      </widget>
     </item>
@@ -868,7 +675,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1417</width>
+     <width>1360</width>
      <height>22</height>
     </rect>
    </property>

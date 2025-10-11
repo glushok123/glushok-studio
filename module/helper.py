@@ -32,14 +32,14 @@ def prepeaImageEnd(self, text):
 
 
 def setParamsUi(self):
-    self.dpi = int(self.textEdit_4.toPlainText())
-    self.kf_w = float(self.textEdit_8.toPlainText())
-    self.kf_h = float(self.textEdit_9.toPlainText())
-    self.width_px = int(self.textEdit_2.toPlainText())
-    self.border_px = int(self.textEdit_3.toPlainText())
-    self.pxStartList = int(self.textEdit_5.toPlainText())
-    self.pxMediumVal = int(self.textEdit_6.toPlainText())
-    self.count_cpu = int(self.textEdit_7.toPlainText())
+    self.dpi = int(self.dpiSpinBox.value())
+    self.kf_w = float(self.widthCoefSpinBox.value())
+    self.kf_h = float(self.heightCoefSpinBox.value())
+    self.width_px = int(self.overlapSpinBox.value())
+    self.border_px = int(self.borderSpinBox.value())
+    self.pxStartList = int(self.startSearchSpinBox.value())
+    self.pxMediumVal = int(self.middleSearchSpinBox.value())
+    self.count_cpu = int(self.cpuSpinBox.value())
     self.isRemoveBorder = self.checkBox.isChecked()  # удалять черную рамку
     self.isSplit = self.checkBox_3.isChecked()  # Делить изображение по полам
     self.isAddBorder = self.checkBox_2.isChecked()  # Добавлять черную рамку
