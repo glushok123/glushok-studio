@@ -6,7 +6,7 @@ from pathlib import Path
 
 import cv2
 
-from .image_utils import apply_border, iter_image_files, load_image, save_with_dpi
+from .image_utils import detect_content_bounds, iter_image_files, load_image, save_with_dpi
 
 
 def initRemovePostBorder(self):
@@ -38,24 +38,21 @@ def removePostBorder(self, file_path: Path) -> str | None:
     except ValueError:
         return None
 
-    height, width = image.shape[:2]
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
+    bounds = detect_content_bounds(gray)
+    if bounds is None or bounds.width == 0 or bounds.height == 0:
         save_path = target_dir / relative.name
         save_with_dpi(image, save_path, self.dpi)
         return str(save_path)
 
-    contour = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(contour)
+    pad_x = self.border_px if self.isAddBorder else 0
+    pad_y = self.border_px if self.isAddBorder and self.isAddBorderForAll else 0
+    expanded = bounds.expand(image.shape, pad_x, pad_y)
 
-    if self.isAddBorder:
-        cropped = apply_border(image[y : y + h, x : x + w], self.border_px)
-    else:
-        cropped = image[y : y + h, x : x + w]
+    if expanded.width <= 0 or expanded.height <= 0:
+        expanded = bounds
+
+    cropped = image[expanded.top : expanded.bottom, expanded.left : expanded.right]
 
     save_path = target_dir / relative.name
     save_with_dpi(cropped, save_path, self.dpi)
