@@ -389,8 +389,6 @@ class MainApp(QMainWindow):
     def handleManualSplitAdjustment(self, payload):
         from pathlib import Path
 
-        import numpy as np
-
         from module.splitImage import (
             ManualSplitDialog,
             ManualSplitEntry,
@@ -434,23 +432,17 @@ class MainApp(QMainWindow):
             prepared = []
             for index, data in enumerate(raw_entries, start=1):
                 try:
-                    shape = tuple(int(dim) for dim in data.get('image_shape', ()) or ())
-                    dtype_str = data.get('image_dtype')
-                    image_bytes = data.get('image_bytes', b'')
-                    if not shape or not dtype_str or not image_bytes:
-                        raise ValueError('Недостаточно данных для изображения')
-                    dtype = np.dtype(dtype_str)
-                    expected = int(np.prod(shape)) * dtype.itemsize
-                    if len(image_bytes) < expected:
-                        raise ValueError('Размер буфера меньше ожидаемого')
-                    buffer = np.frombuffer(image_bytes, dtype=dtype)
-                    if buffer.size != int(np.prod(shape)):
-                        raise ValueError('Размер буфера не соответствует форме')
-                    base_image = buffer.reshape(shape).copy()
+                    source_path = Path(data.get('source_path', ''))
+                    if not source_path:
+                        raise ValueError('Не указан путь к изображению')
+                    width_val = int(data.get('image_width', 0) or 0)
+                    height_val = int(data.get('image_height', 0) or 0)
+                    if width_val <= 0 or height_val <= 0:
+                        raise ValueError('Некорректные размеры изображения')
                     entry = ManualSplitEntry(
-                        relative=Path(data.get('relative', '')),
-                        target_dir=Path(data.get('target_dir', '.')),
-                        base_image=base_image,
+                        source_path=source_path,
+                        relative=Path(data.get('relative') or source_path.name),
+                        target_dir=Path(data.get('target_dir') or '.'),
                         left_path=Path(data.get('left_path', '')),
                         right_path=Path(data.get('right_path', '')),
                         auto_split_x=int(data.get('auto_split_x', 0)),
@@ -458,8 +450,10 @@ class MainApp(QMainWindow):
                         overlap=int(data.get('overlap', 0)),
                         crop_left=int(data.get('crop_left', 0)),
                         crop_top=int(data.get('crop_top', 0)),
-                        crop_right=int(data.get('crop_right', base_image.shape[1])),
-                        crop_bottom=int(data.get('crop_bottom', base_image.shape[0])),
+                        crop_right=int(data.get('crop_right', width_val)),
+                        crop_bottom=int(data.get('crop_bottom', height_val)),
+                        image_width=width_val,
+                        image_height=height_val,
                         rotation_deg=float(data.get('rotation_deg', 0.0)),
                     )
                 except Exception as exc:
@@ -512,6 +506,7 @@ class MainApp(QMainWindow):
                                 width_img = page_image.shape[1] if page_image.ndim >= 2 else 0
                                 height_img = page_image.shape[0] if page_image.ndim >= 2 else 0
                         save_with_dpi(page_image, page_path, dpi_value)
+                    entry.release_image()
 
                 if worker_thread is not None:
                     worker_thread.width_img = width_img
@@ -525,6 +520,11 @@ class MainApp(QMainWindow):
                 accepted = False
             finally:
                 self._activeManualDialog = None
+                for entry in entries:
+                    try:
+                        entry.release_image()
+                    except Exception:
+                        pass
                 finalize(accepted, width_img, height_img)
 
         QtCore.QTimer.singleShot(0, open_dialog)
