@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsView,
+    QGraphicsObject,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -220,33 +221,36 @@ def _numpy_to_qimage(image: np.ndarray) -> QImage:
     return QImage(rgb.data, width, height, rgb.strides[0], QImage.Format_RGB888).copy()
 
 
-class CropHandle(QObject, QGraphicsRectItem):
+class CropHandle(QGraphicsObject):
     moved = pyqtSignal(float)
 
     def __init__(self, orientation: str, size: float = 18.0, parent: QObject | None = None):
-        QObject.__init__(self, parent)
-        QGraphicsRectItem.__init__(self)
+        super().__init__(parent)
         self.orientation = orientation
         self.size = size
         self._minimum = -float("inf")
         self._maximum = float("inf")
         self._fixed = 0.0
+        self._rect = QRectF(-size / 2.0, -size / 2.0, size, size)
+        self._pen = QPen(QColor(255, 255, 255, 220))
+        self._pen.setWidth(1)
+        self._brush = QColor(122, 215, 255, 180)
 
-        half = size / 2.0
-        self.setRect(-half, -half, size, size)
-
-        pen = QPen(QColor(255, 255, 255, 220))
-        pen.setWidth(1)
-        self.setPen(pen)
-        self.setBrush(QColor(122, 215, 255, 180))
         self.setZValue(10)
-
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations, True)
         self.setCursor(
             Qt.SizeHorCursor if orientation in {"left", "right"} else Qt.SizeVerCursor
         )
+
+    def boundingRect(self) -> QRectF:
+        return self._rect
+
+    def paint(self, painter: QPainter, _option, _widget=None) -> None:
+        painter.setPen(self._pen)
+        painter.setBrush(self._brush)
+        painter.drawRect(self._rect)
 
     def set_limits(self, minimum: float, maximum: float, fixed_coord: float) -> None:
         self._minimum = float(minimum)
