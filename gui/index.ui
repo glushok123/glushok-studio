@@ -183,6 +183,7 @@ QStatusBar {
 }
 </string>
   </property>
+
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="mainLayout">
     <property name="spacing">
@@ -200,6 +201,7 @@ QStatusBar {
     <property name="bottomMargin">
      <number>18</number>
     </property>
+
     <item>
      <widget class="QLabel" name="heading">
       <property name="text">
@@ -210,6 +212,7 @@ QStatusBar {
       </property>
      </widget>
     </item>
+
     <item>
      <widget class="QScrollArea" name="contentScrollArea">
       <property name="frameShape">
@@ -224,6 +227,7 @@ QStatusBar {
       <property name="verticalScrollBarPolicy">
        <enum>Qt::ScrollBarAsNeeded</enum>
       </property>
+
       <widget class="QWidget" name="scrollAreaWidgetContents">
        <property name="geometry">
         <rect>
@@ -233,6 +237,7 @@ QStatusBar {
          <height>700</height>
         </rect>
        </property>
+
        <layout class="QVBoxLayout" name="scrollLayout">
         <property name="spacing">
          <number>12</number>
@@ -249,18 +254,21 @@ QStatusBar {
         <property name="bottomMargin">
          <number>0</number>
         </property>
+
         <item>
          <widget class="QFrame" name="contentFrame">
           <layout class="QHBoxLayout" name="contentLayout">
            <property name="spacing">
             <number>22</number>
            </property>
+
            <item>
             <widget class="QFrame" name="controlPanel">
              <layout class="QVBoxLayout" name="controlLayout">
               <property name="spacing">
                <number>16</number>
               </property>
+
               <item>
                <widget class="QGroupBox" name="sourceGroup">
                 <property name="title">
@@ -313,6 +321,7 @@ QStatusBar {
                 </layout>
                </widget>
               </item>
+
               <item>
                <widget class="QGroupBox" name="processingGroup">
                 <property name="title">
@@ -500,206 +509,227 @@ QStatusBar {
                 </layout>
                </widget>
               </item>
+
               <item>
                <widget class="QGroupBox" name="modesGroup">
                 <property name="title">
                  <string>Опции</string>
                 </property>
                 <layout class="QGridLayout" name="gridLayoutModes">
-             <item row="0" column="0">
-              <widget class="QCheckBox" name="checkBox">
-               <property name="text">
-                <string>Удалять черную рамку</string>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QCheckBox" name="checkBox_4">
-               <property name="text">
-                <string>Рамка с 4 сторон</string>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0">
-              <widget class="QCheckBox" name="checkBox_3">
-               <property name="text">
-                <string>Делить изображение по полам</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="QCheckBox" name="checkBox_2">
-               <property name="text">
-                <string>Добавлять черную рамку (ОБРЕЗКА)</string>
-               </property>
-               <property name="checked">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QCheckBox" name="checkBox_8">
-               <property name="text">
-                <string>Добавлять черную рамку (ЧЕРНЫЙ ФОН)</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1">
-              <widget class="QCheckBox" name="checkBox_5">
-               <property name="text">
-                <string>Одинаковое разрешение</string>
-               </property>
-              </widget>
-             </item>
-            <item row="3" column="0" colspan="2">
-             <widget class="QCheckBox" name="checkBox_9">
-              <property name="text">
-               <string>Ручная корректировка середины изображения</string>
-              </property>
+                 <item row="0" column="0">
+                  <widget class="QCheckBox" name="checkBox">
+                   <property name="text">
+                    <string>Удалять черную рамку</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QCheckBox" name="checkBox_4">
+                   <property name="text">
+                    <string>Рамка с 4 сторон</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QCheckBox" name="checkBox_3">
+                   <property name="text">
+                    <string>Делить изображение по полам</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QCheckBox" name="checkBox_2">
+                   <property name="text">
+                    <string>Добавлять черную рамку (ОБРЕЗКА)</string>
+                   </property>
+                   <property name="checked">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QCheckBox" name="checkBox_8">
+                   <property name="text">
+                    <string>Добавлять черную рамку (ЧЕРНЫЙ ФОН)</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="1">
+                  <widget class="QCheckBox" name="checkBox_5">
+                   <property name="text">
+                    <string>Одинаковое разрешение</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="0" colspan="2">
+                  <widget class="QCheckBox" name="checkBox_9">
+                   <property name="text">
+                    <string>Ручная корректировка середины изображения</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="0">
+                  <widget class="QCheckBox" name="checkBox_6">
+                   <property name="text">
+                    <string>Показывать изначальные сканы</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="1">
+                  <widget class="QCheckBox" name="checkBox_7">
+                   <property name="text">
+                    <string>Показывать готовые сканы</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+
+             </layout>  <!-- controlLayout -->
+            </widget>   <!-- controlPanel -->
+           </item>      <!-- item of contentLayout (controlPanel) -->
+
+           <item>
+            <spacer name="verticalSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+
+           <item>
+            <widget class="QPushButton" name="pushButton">
+             <property name="minimumHeight">
+              <number>48</number>
+             </property>
+             <property name="text">
+              <string>Выполнить</string>
+             </property>
+            </widget>
+           </item>
+
+          </layout>     <!-- contentLayout -->
+         </widget>      <!-- contentFrame -->
+        </item>
+
+        <item>
+         <widget class="QFrame" name="previewPanel">
+          <layout class="QVBoxLayout" name="previewLayout">
+           <property name="spacing">
+            <number>16</number>
+           </property>
+
+           <item>
+            <widget class="QTabWidget" name="tabWidget">
+             <property name="currentIndex">
+              <number>0</number>
+             </property>
+
+             <widget class="QWidget" name="tabQueue">
+              <attribute name="title">
+               <string>Очередь</string>
+              </attribute>
+              <layout class="QVBoxLayout" name="verticalLayoutQueue">
+               <item>
+                <widget class="QListWidget" name="folderQueueList"/>
+               </item>
+               <item>
+                <layout class="QHBoxLayout" name="horizontalLayoutQueueButtons">
+                 <item>
+                  <widget class="QPushButton" name="addFolderButton">
+                   <property name="text">
+                    <string>Добавить папку</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QPushButton" name="removeFolderButton">
+                   <property name="text">
+                    <string>Удалить папку</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </item>
+              </layout>
              </widget>
-            </item>
-            <item row="4" column="0">
-             <widget class="QCheckBox" name="checkBox_6">
-              <property name="text">
-               <string>Показывать изначальные сканы</string>
-              </property>
+
+             <widget class="QWidget" name="tabLogs">
+              <attribute name="title">
+               <string>Логи</string>
+              </attribute>
+              <layout class="QVBoxLayout" name="logLayout">
+               <item>
+                <widget class="QTextEdit" name="textEdit"/>
+               </item>
+              </layout>
              </widget>
-            </item>
-            <item row="4" column="1">
-             <widget class="QCheckBox" name="checkBox_7">
-              <property name="text">
-               <string>Показывать готовые сканы</string>
-              </property>
+
+             <widget class="QWidget" name="tabStartScans">
+              <attribute name="title">
+               <string>Изначальные сканы</string>
+              </attribute>
+              <layout class="QVBoxLayout" name="startLayout">
+               <item>
+                <widget class="QListWidget" name="listWidget"/>
+               </item>
+              </layout>
              </widget>
-            </item>
-            </layout>
-           </widget>
-          </item>
-          <item>
-           <spacer name="verticalSpacer">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeType">
-             <enum>QSizePolicy::Expanding</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>40</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-          <item>
-           <widget class="QPushButton" name="pushButton">
-            <property name="minimumHeight">
-             <number>48</number>
-            </property>
-            <property name="text">
-             <string>Выполнить</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QFrame" name="previewPanel">
-         <layout class="QVBoxLayout" name="previewLayout">
-          <property name="spacing">
-           <number>16</number>
-          </property>
-          <item>
-           <widget class="QTabWidget" name="tabWidget">
-            <property name="currentIndex">
-             <number>0</number>
-            </property>
-            <widget class="QWidget" name="tabQueue">
-             <attribute name="title">
-              <string>Очередь</string>
-             </attribute>
-             <layout class="QVBoxLayout" name="verticalLayoutQueue">
-              <item>
-               <widget class="QListWidget" name="folderQueueList"/>
-              </item>
-              <item>
-               <layout class="QHBoxLayout" name="horizontalLayoutQueueButtons">
-                <item>
-                 <widget class="QPushButton" name="addFolderButton">
-                  <property name="text">
-                   <string>Добавить папку</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QPushButton" name="removeFolderButton">
-                  <property name="text">
-                   <string>Удалить папку</string>
-                  </property>
-                 </widget>
-                </item>
-               </layout>
-              </item>
-             </layout>
+
+             <widget class="QWidget" name="tabResultScans">
+              <attribute name="title">
+               <string>Результат</string>
+              </attribute>
+              <layout class="QVBoxLayout" name="resultLayout">
+               <item>
+                <widget class="QListWidget" name="listWidget_2"/>
+               </item>
+              </layout>
+             </widget>
+
             </widget>
-            <widget class="QWidget" name="tabLogs">
-             <attribute name="title">
-              <string>Логи</string>
-             </attribute>
-             <layout class="QVBoxLayout" name="logLayout">
-              <item>
-               <widget class="QTextEdit" name="textEdit"/>
-              </item>
-             </layout>
+           </item>
+
+           <item>
+            <widget class="QLabel" name="label_8">
+             <property name="minimumHeight">
+              <number>260</number>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
             </widget>
-            <widget class="QWidget" name="tabStartScans">
-             <attribute name="title">
-              <string>Изначальные сканы</string>
-             </attribute>
-             <layout class="QVBoxLayout" name="startLayout">
-              <item>
-               <widget class="QListWidget" name="listWidget"/>
-              </item>
-             </layout>
-            </widget>
-            <widget class="QWidget" name="tabResultScans">
-             <attribute name="title">
-              <string>Результат</string>
-             </attribute>
-             <layout class="QVBoxLayout" name="resultLayout">
-              <item>
-               <widget class="QListWidget" name="listWidget_2"/>
-              </item>
-             </layout>
-            </widget>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLabel" name="label_8">
-            <property name="minimumHeight">
-             <number>260</number>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-            <property name="text">
-             <string/>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
+           </item>
+
+          </layout>  <!-- previewLayout -->
+         </widget>   <!-- previewPanel -->
+        </item>
+
+       </layout>   <!-- scrollLayout -->
+      </widget>    <!-- scrollAreaWidgetContents -->
+
+     </widget>     <!-- contentScrollArea -->
+    </item>        <!-- item of mainLayout (contentScrollArea) -->
+
     <item>
      <widget class="QProgressBar" name="progressBar">
       <property name="minimum">
@@ -713,8 +743,10 @@ QStatusBar {
       </property>
      </widget>
     </item>
-   </layout>
-  </widget>
+
+   </layout>   <!-- mainLayout -->
+  </widget>    <!-- centralwidget -->
+
   <widget class="QStatusBar" name="statusbar"/>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
@@ -733,11 +765,13 @@ QStatusBar {
    </widget>
    <addaction name="menu"/>
   </widget>
+
   <action name="action">
    <property name="text">
     <string>Выбрать директорию</string>
    </property>
   </action>
+
  </widget>
  <resources/>
  <connections/>
