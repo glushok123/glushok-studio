@@ -34,6 +34,7 @@ class MainApp(QMainWindow):
         self.border_px = 100
         self.isRemoveBorder = ''
         self.isSplit = ''
+        self.isManualSplitAdjust = False
         self.isAddBorder = ''
         self.isShowStart = True
         self.isShowEnd = True
@@ -255,6 +256,7 @@ class MainApp(QMainWindow):
             self.count_cpu,
             self.isRemoveBorder,
             self.isSplit,
+            self.isManualSplitAdjust,
             self.isAddBorder,
             self.isAddBorderForAll,
             self.isPxIdentically,
@@ -266,6 +268,9 @@ class MainApp(QMainWindow):
 
         # Лог
         self.threadStart.log.connect(self.updateLog)
+
+        # Ручная корректировка разделения
+        self.threadStart.manualAdjustmentRequested.connect(self.handleManualSplitAdjustment)
 
         # Сигнал прогресса
         self.threadStart.proc.connect(lambda p, folder=path: self.updateFolderStatus(folder, 'Обрабатывается', p))
@@ -279,6 +284,28 @@ class MainApp(QMainWindow):
         # Запускаем поток
         self.threadStart.start()
         self.updateLog(f"Начата обработка папки: {path}")
+
+    def handleManualSplitAdjustment(self, payload):
+        from module.splitImage import ManualSplitDialog
+
+        entries = []
+        event = None
+        if isinstance(payload, dict):
+            entries = payload.get('entries') or []
+            event = payload.get('event')
+
+        try:
+            if not entries:
+                return
+
+            dialog = ManualSplitDialog(entries, parent=self)
+            result = dialog.exec_()
+            if result != QDialog.Accepted:
+                for entry in entries:
+                    entry.split_x = entry.auto_split_x
+        finally:
+            if event is not None:
+                event.set()
 
     def finishFolder(self, path):
         """
