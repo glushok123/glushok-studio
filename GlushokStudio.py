@@ -4,6 +4,7 @@ import shutil
 import sys
 import re
 import tempfile
+import traceback
 from PyQt5 import uic, QtCore, QtGui
 from PyQt5.QtGui import QTextCursor, QIcon, QImage
 from PyQt5.QtWidgets import *
@@ -345,7 +346,10 @@ class MainApp(QMainWindow):
         self.threadStart.log.connect(self.updateLog)
 
         # Ручная корректировка разделения
-        self.threadStart.manualAdjustmentRequested.connect(self.handleManualSplitAdjustment)
+        self.threadStart.manualAdjustmentRequested.connect(
+            self.handleManualSplitAdjustment,
+            QtCore.Qt.BlockingQueuedConnection,
+        )
 
         # Сигнал прогресса
         self.threadStart.proc.connect(lambda p, folder=path: self.updateFolderStatus(folder, 'Обрабатывается', p))
@@ -364,23 +368,37 @@ class MainApp(QMainWindow):
         from module.splitImage import ManualSplitDialog
 
         entries = []
-        event = None
+        accepted_flag = None
         if isinstance(payload, dict):
             entries = payload.get('entries') or []
-            event = payload.get('event')
+            accepted_flag = payload
 
         try:
             if not entries:
+                if accepted_flag is not None:
+                    accepted_flag['accepted'] = True
                 return
 
+            print(f"[INFO] Открытие окна ручной корректировки ({len(entries)} элементов)")
             dialog = ManualSplitDialog(entries, parent=self)
             result = dialog.exec_()
-            if result != QDialog.Accepted:
+            accepted = result == QDialog.Accepted
+            if not accepted:
                 for entry in entries:
                     entry.split_x = entry.auto_split_x
-        finally:
-            if event is not None:
-                event.set()
+                print("[WARN] Пользователь отменил ручную корректировку, применены авто-параметры")
+            if accepted_flag is not None:
+                accepted_flag['accepted'] = accepted
+        except Exception as exc:
+            error_text = f"Ошибка при открытии окна ручной корректировки: {exc}"
+            self.updateLog(error_text)
+            tb = traceback.format_exc()
+            print(error_text, file=sys.stderr)
+            print(tb, file=sys.stderr)
+            if accepted_flag is not None:
+                accepted_flag['accepted'] = False
+            for entry in entries:
+                entry.split_x = entry.auto_split_x
 
     def finishFolder(self, path):
         """

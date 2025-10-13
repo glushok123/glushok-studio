@@ -3,6 +3,8 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 import os
 import shutil
+import sys
+import traceback
 
 
 class ThreadStart(QThread):
@@ -192,7 +194,12 @@ class ThreadStart(QThread):
             self.log.emit("КОНЕЦ ОБРАБОТКИ")
             self.end.emit("STOP")  # ← теперь всегда вызывается, даже при isShowEnd = False
         except Exception as e:
-            self.log.emit(f"ОШИБКА В run(): {str(e)}")
+            error_text = f"ОШИБКА В run(): {str(e)}"
+            self.log.emit(error_text)
+            tb = traceback.format_exc()
+            self.log.emit(tb)
+            print(error_text, file=sys.stderr)
+            print(tb, file=sys.stderr)
             self.end.emit("ERROR")
 
     def process(self):
