@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from threading import Thread
 from PyQt5.QtCore import QThread, pyqtSignal
 import os
 import shutil
+import sys
+import traceback
 
 
 class ThreadStart(QThread):
@@ -193,7 +194,12 @@ class ThreadStart(QThread):
             self.log.emit("КОНЕЦ ОБРАБОТКИ")
             self.end.emit("STOP")  # ← теперь всегда вызывается, даже при isShowEnd = False
         except Exception as e:
-            self.log.emit(f"ОШИБКА В run(): {str(e)}")
+            error_text = f"ОШИБКА В run(): {str(e)}"
+            self.log.emit(error_text)
+            tb = traceback.format_exc()
+            self.log.emit(tb)
+            print(error_text, file=sys.stderr)
+            print(tb, file=sys.stderr)
             self.end.emit("ERROR")
 
     def process(self):
@@ -247,20 +253,13 @@ class ThreadStart(QThread):
 
                 if self.isRemoveBorder:
                     self.log.emit("START УДАЛЕНИЯ РАМКИ")
-
-                    t1 = Thread(target=self.initRemoveBorder, daemon=True)
-                    t1.start()
-                    t1.join()
-
+                    self.initRemoveBorder()
                     self.log.emit("STOP УДАЛЕНИЯ РАМКИ")
                     self.fileurl = self.dirInit
 
                 if self.isSplit:
                     self.log.emit("START РАЗДЕЛЕНИЕ ПО СТРАНИЦАМ")
-
-                    t1 = Thread(target=self.initSplitImage, daemon=True)
-                    t1.start()
-                    t1.join()
+                    self.initSplitImage()
 
                     dir = os.path.abspath(os.curdir)
                     dir = dir.replace('\\', '/')
@@ -270,20 +269,12 @@ class ThreadStart(QThread):
 
                 if self.isRemoveBorder and self.isAddBlackBorder:
                     self.log.emit("START УДАЛЕНИЯ РАМКИ ДОП")
-
-                    t1 = Thread(target=self.initRemovePostBorder, daemon=True)
-                    t1.start()
-                    t1.join()
-
+                    self.initRemovePostBorder()
                     self.log.emit("STOP УДАЛЕНИЯ РАМКИ ДОП")
 
                 if self.isAddBlackBorder:
                     self.log.emit("START ДОБАВЛЕНИЯ РАМКИ")
-
-                    t1 = Thread(target=self.initAddBorder, daemon=True)
-                    t1.start()
-                    t1.join()
-
+                    self.initAddBorder()
                     self.log.emit("STOP ДОБАВЛЕНИЯ РАМКИ")
                     self.fileurl = self.dirInit
 
@@ -314,20 +305,13 @@ class ThreadStart(QThread):
 
             if self.isRemoveBorder:
                 self.log.emit("START УДАЛЕНИЯ РАМКИ")
-
-                t1 = Thread(target=self.initRemoveBorder, daemon=True)
-                t1.start()
-                t1.join()
-
+                self.initRemoveBorder()
                 self.log.emit("STOP УДАЛЕНИЯ РАМКИ")
                 self.fileurl = self.dirInit
 
             if self.isSplit:
                 self.log.emit("START РАЗДЕЛЕНИЕ ПО СТРАНИЦАМ")
-
-                t1 = Thread(target=self.initSplitImage, daemon=True)
-                t1.start()
-                t1.join()
+                self.initSplitImage()
 
                 dir = os.path.abspath(os.curdir)
                 dir = dir.replace('\\', '/')
@@ -337,20 +321,12 @@ class ThreadStart(QThread):
 
             if self.isRemoveBorder and self.isAddBlackBorder:
                 self.log.emit("START УДАЛЕНИЯ РАМКИ ДОП")
-
-                t1 = Thread(target=self.initRemovePostBorder, daemon=True)
-                t1.start()
-                t1.join()
-
+                self.initRemovePostBorder()
                 self.log.emit("STOP УДАЛЕНИЯ РАМКИ ДОП")
 
             if self.isAddBlackBorder:
                 self.log.emit("START ДОБАВЛЕНИЯ РАМКИ")
-
-                t1 = Thread(target=self.initAddBorder, daemon=True)
-                t1.start()
-                t1.join()
-
+                self.initAddBorder()
                 self.log.emit("STOP ДОБАВЛЕНИЯ РАМКИ")
                 self.fileurl = self.dirInit
 

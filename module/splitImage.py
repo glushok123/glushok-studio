@@ -1,8 +1,8 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Event
 from typing import List
+from threading import Event
 
 import cv2
 import numpy as np
@@ -38,14 +38,16 @@ from .image_utils import (
 
 @dataclass
 class ManualSplitEntry:
+    source_path: Path
     relative: Path
     target_dir: Path
-    base_image: np.ndarray
     left_path: Path
     right_path: Path
     auto_split_x: int
     split_x: int
     overlap: int
+    image_width: int
+    image_height: int
     crop_left: int = 0
     crop_top: int = 0
     crop_right: int = 0
@@ -53,17 +55,20 @@ class ManualSplitEntry:
     rotation_deg: float = 0.0
     split_x_base: int = field(init=False)
     split_ratio: float = field(init=False)
+    _base_image: np.ndarray | None = field(default=None, init=False, repr=False, compare=False)
     _preview_qimage: QImage | None = field(default=None, init=False, repr=False, compare=False)
 
     @property
     def width(self) -> int:
-        return int(self.base_image.shape[1]) if self.base_image.size else 0
+        return max(1, int(self.image_width))
 
     @property
     def height(self) -> int:
-        return int(self.base_image.shape[0]) if self.base_image.size else 0
+        return max(1, int(self.image_height))
 
     def __post_init__(self) -> None:
+        self.image_width = max(1, int(self.image_width))
+        self.image_height = max(1, int(self.image_height))
         self.crop_left = max(0, int(self.crop_left))
         self.crop_top = max(0, int(self.crop_top))
         self.crop_right = self.crop_right or self.width
@@ -80,9 +85,29 @@ class ManualSplitEntry:
         self.split_x_base = int(self.crop_left + self.split_x)
 
     def preview_qimage(self) -> QImage:
+        base = self.ensure_loaded()
         if self._preview_qimage is None:
-            self._preview_qimage = _numpy_to_qimage(self.base_image)
+            self._preview_qimage = _numpy_to_qimage(base)
         return self._preview_qimage
+
+    def ensure_loaded(self) -> np.ndarray:
+        if self._base_image is None:
+            image = load_image(self.source_path)
+            if image is None:
+                raise ValueError(f"Не удалось загрузить изображение: {self.source_path}")
+            self._base_image = np.ascontiguousarray(image)
+            self.image_height, self.image_width = self._base_image.shape[:2]
+            self._preview_qimage = None
+            if self.crop_right <= self.crop_left:
+                self.crop_right = self.width
+            if self.crop_bottom <= self.crop_top:
+                self.crop_bottom = self.height
+            self.set_split_x(int(self.split_x))
+        return self._base_image
+
+    def release_image(self) -> None:
+        self._base_image = None
+        self._preview_qimage = None
 
     @property
     def current_width(self) -> int:
@@ -126,11 +151,10 @@ class ManualSplitEntry:
         self.split_x_base = int(self.crop_left + self.split_x)
 
     def build_processed_image(self) -> np.ndarray:
-        crop_view = self.base_image[
-            self.crop_top : self.crop_bottom, self.crop_left : self.crop_right
-        ]
+        base = self.ensure_loaded()
+        crop_view = base[self.crop_top : self.crop_bottom, self.crop_left : self.crop_right]
         if not crop_view.size:
-            return self.base_image.copy()
+            return base.copy()
 
         crop = crop_view.copy()
 
@@ -261,6 +285,7 @@ class ManualSplitDialog(QDialog):
         self._grid_lines: list[QGraphicsLineItem] = []
         self._loaded_entry: ManualSplitEntry | None = None
         self._updating = False
+        self._last_loaded_index: int | None = None
 
         self.setWindowTitle("Ручная корректировка середины")
         self.resize(900, 600)
@@ -377,7 +402,18 @@ class ManualSplitDialog(QDialog):
                 widget.setEnabled(False)
 
     def display_current_entry(self):
+        if (
+            self._last_loaded_index is not None
+            and 0 <= self._last_loaded_index < len(self.entries)
+            and self._last_loaded_index != self.current_index
+        ):
+            try:
+                self.entries[self._last_loaded_index].release_image()
+            except Exception:
+                pass
+
         entry = self.entries[self.current_index]
+        self._last_loaded_index = self.current_index
         self.fileLabel.setText(
             f"{entry.relative.name} ({self.current_index + 1}/{len(self.entries)})"
         )
@@ -717,6 +753,11 @@ class ManualSplitDialog(QDialog):
     def closeEvent(self, event):
         if self.fullscreenButton.isChecked():
             self.fullscreenButton.setChecked(False)
+        for entry in self.entries:
+            try:
+                entry.release_image()
+            except Exception:
+                pass
         super().closeEvent(event)
 
 
@@ -746,32 +787,36 @@ def initSplitImage(self):
     if getattr(self, "isManualSplitAdjust", False) and manual_entries:
         if hasattr(self, "log"):
             self.log.emit("Ожидание ручной корректировки середины")
+        print(f"[INFO] Найдено {len(manual_entries)} файлов для ручной корректировки")
 
         wait_event = Event()
-        payload = {"entries": manual_entries, "event": wait_event}
+        result_holder = {"accepted": False, "width_img": self.width_img, "height_img": self.height_img}
+        payload = {
+            "entries": manual_entries,
+            "wait_event": wait_event,
+            "result": result_holder,
+            "thread": self,
+        }
         self.manualAdjustmentRequested.emit(payload)
         wait_event.wait()
+        accepted = bool(result_holder.get("accepted"))
+        if "width_img" in result_holder:
+            try:
+                self.width_img = int(result_holder["width_img"] or 0)
+            except Exception:
+                pass
+        if "height_img" in result_holder:
+            try:
+                self.height_img = int(result_holder["height_img"] or 0)
+            except Exception:
+                pass
+        print("[INFO] Слот ручной корректировки завершил работу")
 
         if hasattr(self, "log"):
+            status = "принята" if accepted else "отменена"
+            self.log.emit(f"Ручная корректировка {status}, продолжаем обработку")
             self.log.emit("Сохранение результатов ручной корректировки")
-
-        self.width_img = 0
-        self.height_img = 0
-
-        for entry in manual_entries:
-            final_image = entry.build_processed_image()
-            final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
-            split_position = entry.final_split_position(final_width)
-            result = split_with_fixed_position(final_image, split_position, entry.overlap)
-            pages = ((result.left, entry.left_path), (result.right, entry.right_path))
-            for page_image, page_path in pages:
-                if self.isPxIdentically:
-                    if self.width_img and self.height_img:
-                        page_image = _fit_page_to_canvas(page_image, self.width_img, self.height_img)
-                    else:
-                        self.width_img, self.height_img = page_image.shape[1], page_image.shape[0]
-
-                save_with_dpi(page_image, page_path, self.dpi)
+        print(f"[INFO] Ручная корректировка { 'принята' if accepted else 'отменена' }")
 
         self._manual_split_entries = []
 
@@ -843,21 +888,24 @@ def parseImage(self, file_path: Path) -> str | None:
         if not hasattr(self, "_manual_split_entries"):
             self._manual_split_entries = []
 
-        entry = ManualSplitEntry(
-            relative=relative,
-            target_dir=target_dir,
-            base_image=image.copy(),
-            left_path=left_path,
-            right_path=right_path,
-            auto_split_x=spread.split_x,
-            split_x=spread.split_x,
-            overlap=self.width_px,
-            crop_left=0,
-            crop_top=0,
-            crop_right=image.shape[1],
-            crop_bottom=image.shape[0],
-        )
-        self._manual_split_entries.append(entry)
+        entry_data = {
+            "source_path": str(file_path),
+            "relative": str(relative),
+            "target_dir": str(target_dir),
+            "left_path": str(left_path),
+            "right_path": str(right_path),
+            "auto_split_x": int(spread.split_x),
+            "split_x": int(spread.split_x),
+            "overlap": int(self.width_px),
+            "crop_left": 0,
+            "crop_top": 0,
+            "crop_right": int(image.shape[1]),
+            "crop_bottom": int(image.shape[0]),
+            "rotation_deg": 0.0,
+            "image_width": int(image.shape[1]),
+            "image_height": int(image.shape[0]),
+        }
+        self._manual_split_entries.append(entry_data)
         return str(file_path)
 
     for page_image, page_path in ((spread.left, left_path), (spread.right, right_path)):
