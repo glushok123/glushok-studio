@@ -373,11 +373,35 @@ class MainApp(QMainWindow):
             if not entries:
                 return
 
+            original_states = [
+                (
+                    entry,
+                    {
+                        'split_x': entry.split_x,
+                        'split_ratio': entry.split_ratio,
+                        'split_x_base': entry.split_x_base,
+                        'crop_left': entry.crop_left,
+                        'crop_top': entry.crop_top,
+                        'crop_right': entry.crop_right,
+                        'crop_bottom': entry.crop_bottom,
+                        'rotation_deg': entry.rotation_deg,
+                    },
+                )
+                for entry in entries
+            ]
+
             dialog = ManualSplitDialog(entries, parent=self)
             result = dialog.exec_()
             if result != QDialog.Accepted:
-                for entry in entries:
-                    entry.split_x = entry.auto_split_x
+                for entry, state in original_states:
+                    entry.crop_left = state['crop_left']
+                    entry.crop_top = state['crop_top']
+                    entry.crop_right = state['crop_right']
+                    entry.crop_bottom = state['crop_bottom']
+                    entry.rotation_deg = state['rotation_deg']
+                    entry.split_x = state['split_x']
+                    entry.split_ratio = state['split_ratio']
+                    entry.split_x_base = state['split_x_base']
         finally:
             if event is not None:
                 event.set()
