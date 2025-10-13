@@ -72,13 +72,26 @@ def ensure_ui_is_wellformed(src_path: str) -> str:
         f.write(fixed_text)
     return tmp_path
 
+
+def load_ui_with_repair(ui_path: str, baseinstance: QMainWindow) -> None:
+    """Load the Qt Designer UI, repairing it only when absolutely necessary."""
+    from PyQt5.uic import loadUi
+    from xml.etree.ElementTree import ParseError
+
+    try:
+        loadUi(ui_path, baseinstance)
+        return
+    except ParseError:
+        # Fall back to a sanitized copy for legacy UI files with mismatched tags.
+        repaired_path = ensure_ui_is_wellformed(ui_path)
+        loadUi(repaired_path, baseinstance)
+
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        from PyQt5.uic import loadUi
         base_dir = os.path.dirname(os.path.abspath(__file__))
         ui_path = os.path.join(base_dir, 'gui', 'index.ui')
-        loadUi(ensure_ui_is_wellformed(ui_path), self)
+        load_ui_with_repair(ui_path, self)
 
         # Очередь папок: каждый элемент — словарь {'path': str, 'status': str, 'progress': int}
         self.folderQueue = []
