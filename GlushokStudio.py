@@ -2,6 +2,8 @@
 import os
 import shutil
 import sys
+import re
+import tempfile
 from PyQt5 import uic, QtCore, QtGui
 from PyQt5.QtGui import QTextCursor, QIcon, QImage
 from PyQt5.QtWidgets import *
@@ -12,11 +14,84 @@ from functools import partial
 
 #pyinstaller --onefile  .\GlushokStudio.py
 
+
+def ensure_ui_is_wellformed(src_path: str) -> str:
+    """Return a temporary path to a well-formed copy of the Qt Designer UI file."""
+    with open(src_path, encoding='utf-8') as f:
+        text = f.read()
+
+    token_pattern = re.compile(r'<(/?)([^\s>/]+)([^>]*)>')
+    parts = []
+    stack = []  # list of (tag, indent)
+    pos = 0
+
+    def append_closing(tag: str, indent: str) -> None:
+        if parts and not parts[-1].endswith('\n'):
+            parts.append('\n')
+        parts.append(f"{indent}</{tag}>")
+
+    for match in token_pattern.finditer(text):
+        parts.append(text[pos:match.start()])
+        token = match.group(0)
+
+        if token.startswith('<?'):
+            parts.append(token)
+            pos = match.end()
+            continue
+
+        closing = match.group(1) == '/'
+        name = match.group(2)
+        self_closing = token.endswith('/>')
+        start = text.rfind('\n', 0, match.start()) + 1
+        indent = text[start:match.start()]
+
+        if closing:
+            while stack and stack[-1][0] != name:
+                append_closing(*stack.pop())
+            if stack and stack[-1][0] == name:
+                stack.pop()
+                parts.append(token)
+            else:
+                parts.append(token)
+        elif self_closing:
+            parts.append(token)
+        else:
+            stack.append((name, indent))
+            parts.append(token)
+
+        pos = match.end()
+
+    parts.append(text[pos:])
+
+    while stack:
+        append_closing(*stack.pop())
+
+    fixed_text = ''.join(parts)
+    tmp_path = os.path.join(tempfile.gettempdir(), 'glushok_index.ui')
+    with open(tmp_path, 'w', encoding='utf-8') as f:
+        f.write(fixed_text)
+    return tmp_path
+
+
+def load_ui_with_repair(ui_path: str, baseinstance: QMainWindow) -> None:
+    """Load the Qt Designer UI, repairing it only when absolutely necessary."""
+    from PyQt5.uic import loadUi
+    from xml.etree.ElementTree import ParseError
+
+    try:
+        loadUi(ui_path, baseinstance)
+        return
+    except ParseError:
+        # Fall back to a sanitized copy for legacy UI files with mismatched tags.
+        repaired_path = ensure_ui_is_wellformed(ui_path)
+        loadUi(repaired_path, baseinstance)
+
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        from PyQt5.uic import loadUi
-        loadUi('gui/index.ui', self)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        ui_path = os.path.join(base_dir, 'gui', 'index.ui')
+        load_ui_with_repair(ui_path, self)
 
         # Очередь папок: каждый элемент — словарь {'path': str, 'status': str, 'progress': int}
         self.folderQueue = []
@@ -34,6 +109,7 @@ class MainApp(QMainWindow):
         self.border_px = 100
         self.isRemoveBorder = ''
         self.isSplit = ''
+        self.isManualSplitAdjust = False
         self.isAddBorder = ''
         self.isShowStart = True
         self.isShowEnd = True
@@ -255,6 +331,7 @@ class MainApp(QMainWindow):
             self.count_cpu,
             self.isRemoveBorder,
             self.isSplit,
+            self.isManualSplitAdjust,
             self.isAddBorder,
             self.isAddBorderForAll,
             self.isPxIdentically,
@@ -266,6 +343,9 @@ class MainApp(QMainWindow):
 
         # Лог
         self.threadStart.log.connect(self.updateLog)
+
+        # Ручная корректировка разделения
+        self.threadStart.manualAdjustmentRequested.connect(self.handleManualSplitAdjustment)
 
         # Сигнал прогресса
         self.threadStart.proc.connect(lambda p, folder=path: self.updateFolderStatus(folder, 'Обрабатывается', p))
@@ -279,6 +359,28 @@ class MainApp(QMainWindow):
         # Запускаем поток
         self.threadStart.start()
         self.updateLog(f"Начата обработка папки: {path}")
+
+    def handleManualSplitAdjustment(self, payload):
+        from module.splitImage import ManualSplitDialog
+
+        entries = []
+        event = None
+        if isinstance(payload, dict):
+            entries = payload.get('entries') or []
+            event = payload.get('event')
+
+        try:
+            if not entries:
+                return
+
+            dialog = ManualSplitDialog(entries, parent=self)
+            result = dialog.exec_()
+            if result != QDialog.Accepted:
+                for entry in entries:
+                    entry.split_x = entry.auto_split_x
+        finally:
+            if event is not None:
+                event.set()
 
     def finishFolder(self, path):
         """
