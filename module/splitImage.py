@@ -6,10 +6,14 @@ from typing import List
 
 import cv2
 import numpy as np
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QImage, QPen, QPixmap, QPainter
+from PyQt5.QtCore import Qt, QPointF, QRectF, pyqtSignal, QObject
+from PyQt5.QtGui import QImage, QPen, QPixmap, QPainter, QColor
 from PyQt5.QtWidgets import (
     QDialog,
+    QGraphicsItem,
+    QGraphicsLineItem,
+    QGraphicsPixmapItem,
+    QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsView,
     QGroupBox,
@@ -48,6 +52,8 @@ class ManualSplitEntry:
     crop_bottom: int = 0
     rotation_deg: float = 0.0
     split_x_base: int = field(init=False)
+    split_ratio: float = field(init=False)
+    _preview_qimage: QImage | None = field(default=None, init=False, repr=False, compare=False)
 
     @property
     def width(self) -> int:
@@ -65,8 +71,18 @@ class ManualSplitEntry:
         self.crop_right = max(self.crop_left + 1, int(self.crop_right))
         self.crop_bottom = max(self.crop_top + 1, int(self.crop_bottom))
         self.rotation_deg = float(self.rotation_deg)
-        self.split_x = int(np.clip(self.split_x, 0, self.current_width - 1)) if self.current_width else 0
+        if self.current_width > 0:
+            self.split_x = int(np.clip(self.split_x, 0, self.current_width - 1))
+            self.split_ratio = float(np.clip(self.split_x / self.current_width, 0.0, 1.0))
+        else:
+            self.split_x = 0
+            self.split_ratio = 0.5
         self.split_x_base = int(self.crop_left + self.split_x)
+
+    def preview_qimage(self) -> QImage:
+        if self._preview_qimage is None:
+            self._preview_qimage = _numpy_to_qimage(self.base_image)
+        return self._preview_qimage
 
     @property
     def current_width(self) -> int:
@@ -76,7 +92,40 @@ class ManualSplitEntry:
     def current_height(self) -> int:
         return max(1, int(self.crop_bottom - self.crop_top))
 
-    def build_image(self) -> np.ndarray:
+    @property
+    def crop_centre(self) -> tuple[float, float]:
+        return (
+            float(self.crop_left + self.current_width / 2.0),
+            float(self.crop_top + self.current_height / 2.0),
+        )
+
+    def set_split_x(self, value: int) -> None:
+        width = self.current_width
+        if width <= 1:
+            self.split_x = 0
+            self.split_ratio = 0.5
+            self.split_x_base = int(self.crop_left)
+            return
+
+        value = int(np.clip(value, 0, width - 1))
+        self.split_x = value
+        self.split_ratio = float(np.clip(value / width, 0.0, 1.0))
+        self.split_x_base = int(self.crop_left + self.split_x)
+
+    def update_split_from_ratio(self) -> None:
+        width = self.current_width
+        if width <= 1:
+            self.split_x = 0
+            self.split_x_base = int(self.crop_left)
+            return
+
+        ratio = float(np.clip(self.split_ratio, 0.0, 1.0))
+        value = int(round(ratio * (width - 1)))
+        value = int(np.clip(value, 0, width - 1))
+        self.split_x = value
+        self.split_x_base = int(self.crop_left + self.split_x)
+
+    def build_processed_image(self) -> np.ndarray:
         crop_view = self.base_image[
             self.crop_top : self.crop_bottom, self.crop_left : self.crop_right
         ]
@@ -88,16 +137,53 @@ class ManualSplitEntry:
         if abs(self.rotation_deg) < 1e-3:
             return crop
 
-        centre = (crop.shape[1] / 2.0, crop.shape[0] / 2.0)
+        height, width = crop.shape[:2]
+        centre = (width / 2.0, height / 2.0)
+
         matrix = cv2.getRotationMatrix2D(centre, self.rotation_deg, 1.0)
+        cos = abs(matrix[0, 0])
+        sin = abs(matrix[0, 1])
+
+        new_width = int(np.ceil(width * cos + height * sin))
+        new_height = int(np.ceil(width * sin + height * cos))
+
+        matrix[0, 2] += new_width / 2.0 - centre[0]
+        matrix[1, 2] += new_height / 2.0 - centre[1]
+
         rotated = cv2.warpAffine(
             crop,
             matrix,
-            (crop.shape[1], crop.shape[0]),
-            flags=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_REPLICATE,
+            (new_width, new_height),
+            flags=cv2.INTER_CUBIC,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0,
         )
-        return rotated
+
+        mask = np.ones((height, width), dtype=np.uint8) * 255
+        rotated_mask = cv2.warpAffine(
+            mask,
+            matrix,
+            (new_width, new_height),
+            flags=cv2.INTER_NEAREST,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0,
+        )
+
+        coords = cv2.findNonZero(rotated_mask)
+        if coords is None:
+            return rotated
+
+        x, y, w_box, h_box = cv2.boundingRect(coords)
+        trimmed = rotated[y : y + h_box, x : x + w_box]
+        return trimmed if trimmed.size else rotated
+
+    def final_split_position(self, final_width: int) -> int:
+        if final_width <= 1:
+            return 0
+
+        ratio = float(np.clip(self.split_ratio, 0.0, 1.0))
+        position = int(round(ratio * (final_width - 1)))
+        return int(np.clip(position, 0, final_width - 1))
 
 
 def _numpy_to_qimage(image: np.ndarray) -> QImage:
@@ -110,6 +196,56 @@ def _numpy_to_qimage(image: np.ndarray) -> QImage:
     return QImage(rgb.data, width, height, rgb.strides[0], QImage.Format_RGB888).copy()
 
 
+class CropHandle(QObject, QGraphicsRectItem):
+    moved = pyqtSignal(float)
+
+    def __init__(self, orientation: str, size: float = 18.0, parent: QObject | None = None):
+        QObject.__init__(self, parent)
+        QGraphicsRectItem.__init__(self)
+        self.orientation = orientation
+        self.size = size
+        self._minimum = -float("inf")
+        self._maximum = float("inf")
+        self._fixed = 0.0
+
+        half = size / 2.0
+        self.setRect(-half, -half, size, size)
+
+        pen = QPen(QColor(255, 255, 255, 220))
+        pen.setWidth(1)
+        self.setPen(pen)
+        self.setBrush(QColor(122, 215, 255, 180))
+        self.setZValue(10)
+
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setFlag(QGraphicsItem.ItemIgnoresTransformations, True)
+        self.setCursor(
+            Qt.SizeHorCursor if orientation in {"left", "right"} else Qt.SizeVerCursor
+        )
+
+    def set_limits(self, minimum: float, maximum: float, fixed_coord: float) -> None:
+        self._minimum = float(minimum)
+        self._maximum = float(maximum)
+        self._fixed = float(fixed_coord)
+
+    def itemChange(self, change: "QGraphicsItem.GraphicsItemChange", value):
+        if change == QGraphicsItem.ItemPositionChange:
+            point: QPointF = value
+            if self.orientation in {"left", "right"}:
+                x = max(self._minimum, min(self._maximum, point.x()))
+                return QPointF(x, self._fixed)
+            else:
+                y = max(self._minimum, min(self._maximum, point.y()))
+                return QPointF(self._fixed, y)
+
+        if change == QGraphicsItem.ItemPositionHasChanged:
+            coord = self.pos().x() if self.orientation in {"left", "right"} else self.pos().y()
+            self.moved.emit(float(coord))
+
+        return super().itemChange(change, value)
+
+
 class ManualSplitDialog(QDialog):
     ROTATION_STEP = 0.5
 
@@ -117,10 +253,13 @@ class ManualSplitDialog(QDialog):
         super().__init__(parent)
         self.entries = entries
         self.current_index = 0
-        self._pixmap_item = None
-        self._split_line = None
-        self._current_pixmap = None
-        self._grid_lines: list = []
+
+        self._pixmap_item: QGraphicsPixmapItem | None = None
+        self._split_line: QGraphicsLineItem | None = None
+        self._crop_rect_item: QGraphicsRectItem | None = None
+        self._handles: dict[str, CropHandle] = {}
+        self._grid_lines: list[QGraphicsLineItem] = []
+        self._loaded_entry: ManualSplitEntry | None = None
         self._updating = False
 
         self.setWindowTitle("Ручная корректировка середины")
@@ -130,6 +269,8 @@ class ManualSplitDialog(QDialog):
         self.view = QGraphicsView(self.scene, self)
         self.view.setRenderHint(QPainter.Antialiasing, True)
         self.view.setRenderHint(QPainter.SmoothPixmapTransform, True)
+        self.view.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.view.setAlignment(Qt.AlignCenter)
 
         self.fileLabel = QLabel()
         self.positionLabel = QLabel()
@@ -178,7 +319,7 @@ class ManualSplitDialog(QDialog):
         self.bottomSpin = QSpinBox()
 
         for spin in (self.leftSpin, self.rightSpin, self.topSpin, self.bottomSpin):
-            spin.setMaximum(99999)
+            spin.setMaximum(999999)
             spin.valueChanged.connect(self.on_crop_changed)
 
         cropLayout.addWidget(QLabel("Слева"), 0, 0)
@@ -226,43 +367,22 @@ class ManualSplitDialog(QDialog):
         if self.entries:
             self.display_current_entry()
         else:
-            self.slider.setEnabled(False)
-            self.prevButton.setEnabled(False)
-            self.nextButton.setEnabled(False)
-            self.resetButton.setEnabled(False)
-            self.finishButton.setEnabled(False)
+            for widget in (
+                self.slider,
+                self.prevButton,
+                self.nextButton,
+                self.resetButton,
+                self.finishButton,
+            ):
+                widget.setEnabled(False)
 
     def display_current_entry(self):
         entry = self.entries[self.current_index]
-        self._updating = True
-
-        max_width = max(1, entry.width - 1)
-        max_height = max(1, entry.height - 1)
-
-        self.leftSpin.setMaximum(max_width)
-        self.rightSpin.setMaximum(entry.width)
-        self.topSpin.setMaximum(max_height)
-        self.bottomSpin.setMaximum(entry.height)
-
-        self.leftSpin.setValue(entry.crop_left)
-        self.rightSpin.setValue(entry.crop_right)
-        self.topSpin.setValue(entry.crop_top)
-        self.bottomSpin.setValue(entry.crop_bottom)
-
-        slider_max = max(0, entry.current_width - 1)
-        entry.split_x = int(min(entry.split_x, slider_max))
-        entry.split_x_base = int(entry.crop_left + entry.split_x)
-        self.slider.blockSignals(True)
-        self.slider.setMaximum(slider_max)
-        self.slider.setValue(min(entry.split_x, slider_max))
-        self.slider.blockSignals(False)
-
-        self.slider.setEnabled(entry.current_width > 1)
-
-        self._updating = False
-
-        self.fileLabel.setText(f"{entry.relative.name} ({self.current_index + 1}/{len(self.entries)})")
+        self.fileLabel.setText(
+            f"{entry.relative.name} ({self.current_index + 1}/{len(self.entries)})"
+        )
         self.update_navigation()
+        self._sync_controls(entry)
         self.refresh_scene()
 
     def update_navigation(self):
@@ -270,14 +390,17 @@ class ManualSplitDialog(QDialog):
         self.nextButton.setEnabled(self.current_index < len(self.entries) - 1)
 
     def on_slider_changed(self, value: int):
+        if self._updating or not self.entries:
+            return
         entry = self.entries[self.current_index]
-        entry.split_x = int(value)
-        entry.split_x_base = int(entry.crop_left + entry.split_x)
+        entry.set_split_x(int(value))
         self.positionLabel.setText(
             f"Позиция разреза: {entry.split_x}px из {entry.current_width}px"
         )
         if self._split_line is not None:
-            self._split_line.setLine(entry.split_x, 0, entry.split_x, entry.current_height)
+            self._split_line.setLine(
+                entry.split_x_base, entry.crop_top, entry.split_x_base, entry.crop_bottom
+            )
 
     def goto_previous(self):
         if self.current_index <= 0:
@@ -292,61 +415,44 @@ class ManualSplitDialog(QDialog):
         self.display_current_entry()
 
     def reset_current(self):
+        if not self.entries:
+            return
         entry = self.entries[self.current_index]
         entry.crop_left = 0
         entry.crop_top = 0
         entry.crop_right = entry.width
         entry.crop_bottom = entry.height
         entry.rotation_deg = 0.0
-        entry.split_x = int(np.clip(entry.auto_split_x, 0, entry.current_width - 1))
-        entry.split_x_base = entry.crop_left + entry.split_x
-
-        self.display_current_entry()
+        auto_split = int(np.clip(entry.auto_split_x, 0, entry.width - 1)) if entry.width > 1 else 0
+        entry.set_split_x(auto_split)
+        self._sync_controls(entry)
+        self.refresh_scene()
 
     def reset_rotation(self):
+        if not self.entries:
+            return
         entry = self.entries[self.current_index]
         entry.rotation_deg = 0.0
         self.refresh_scene()
 
     def adjust_rotation(self, delta: float):
+        if not self.entries:
+            return
         entry = self.entries[self.current_index]
         entry.rotation_deg = float(entry.rotation_deg + delta)
         self.refresh_scene()
 
     def on_crop_changed(self):
-        if self._updating:
+        if self._updating or not self.entries:
             return
-
         entry = self.entries[self.current_index]
-
-        width = entry.width
-        height = entry.height
-
-        left = max(0, min(self.leftSpin.value(), width - 2))
-        right = max(left + 1, min(self.rightSpin.value(), width))
-        top = max(0, min(self.topSpin.value(), height - 2))
-        bottom = max(top + 1, min(self.bottomSpin.value(), height))
-
-        entry.crop_left = left
-        entry.crop_right = right
-        entry.crop_top = top
-        entry.crop_bottom = bottom
-
-        entry.split_x_base = int(np.clip(entry.split_x_base, entry.crop_left, entry.crop_right - 1))
-        entry.split_x = int(entry.split_x_base - entry.crop_left)
-
-        self._updating = True
-        slider_max = max(0, entry.current_width - 1)
-        self.slider.setMaximum(slider_max)
-        self.slider.setValue(min(entry.split_x, slider_max))
-        self.slider.setEnabled(entry.current_width > 1)
-        self.leftSpin.setValue(entry.crop_left)
-        self.rightSpin.setValue(entry.crop_right)
-        self.topSpin.setValue(entry.crop_top)
-        self.bottomSpin.setValue(entry.crop_bottom)
-        self._updating = False
-
-        self.refresh_scene()
+        self._apply_crop_change(
+            entry,
+            left=self.leftSpin.value(),
+            right=self.rightSpin.value(),
+            top=self.topSpin.value(),
+            bottom=self.bottomSpin.value(),
+        )
 
     def toggle_fullscreen(self, checked: bool):
         if checked:
@@ -361,55 +467,252 @@ class ManualSplitDialog(QDialog):
             return
 
         entry = self.entries[self.current_index]
-        image = entry.build_image()
-
-        self.scene.clear()
-        self._grid_lines = []
-        self._pixmap_item = None
-        self._split_line = None
-
-        pixmap = QPixmap.fromImage(_numpy_to_qimage(image))
-        self._current_pixmap = pixmap
-        self._pixmap_item = self.scene.addPixmap(pixmap)
-        self.scene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
-
-        pen = QPen(Qt.red)
-        pen.setWidth(max(2, pixmap.width() // 400))
-        self._split_line = self.scene.addLine(
-            entry.split_x, 0, entry.split_x, pixmap.height(), pen
-        )
-
-        self._draw_grid(pixmap.width(), pixmap.height())
+        self._load_entry(entry)
+        self._update_pixmap(entry)
+        self._update_overlay(entry)
+        self._update_grid(entry)
+        self._update_scene_rect()
 
         self.view.resetTransform()
-        self.view.fitInView(self.scene.sceneRect(), Qt.KeepAspectRatio)
+        rect = self.scene.sceneRect()
+        if rect.width() > 0 and rect.height() > 0:
+            self.view.fitInView(rect, Qt.KeepAspectRatio)
 
         self.positionLabel.setText(
             f"Позиция разреза: {entry.split_x}px из {entry.current_width}px"
         )
         self.rotationLabel.setText(f"Поворот: {entry.rotation_deg:.2f}°")
 
-    def _draw_grid(self, width: int, height: int) -> None:
+    def _load_entry(self, entry: ManualSplitEntry) -> None:
+        if self._pixmap_item is None:
+            pixmap = QPixmap.fromImage(entry.preview_qimage())
+            self._pixmap_item = QGraphicsPixmapItem(pixmap)
+            self._pixmap_item.setTransformationMode(Qt.SmoothTransformation)
+            self.scene.addItem(self._pixmap_item)
+        elif self._loaded_entry is not entry:
+            self._pixmap_item.setPixmap(QPixmap.fromImage(entry.preview_qimage()))
+
+        if self._crop_rect_item is None:
+            pen = QPen(QColor(239, 83, 80))
+            pen.setWidth(2)
+            self._crop_rect_item = self.scene.addRect(QRectF(), pen)
+            self._crop_rect_item.setZValue(2)
+
+        if self._split_line is None:
+            pen = QPen(Qt.red)
+            pen.setWidth(2)
+            self._split_line = self.scene.addLine(0, 0, 0, 0, pen)
+            self._split_line.setZValue(3)
+
+        if not self._handles:
+            for side in ("left", "right", "top", "bottom"):
+                handle = CropHandle(side)
+                handle.moved.connect(lambda coord, s=side: self._handle_moved(s, coord))
+                self.scene.addItem(handle)
+                self._handles[side] = handle
+
+        self._loaded_entry = entry
+
+    def _update_pixmap(self, entry: ManualSplitEntry) -> None:
+        if not self._pixmap_item:
+            return
+
+        if self._loaded_entry is not entry:
+            self._pixmap_item.setPixmap(QPixmap.fromImage(entry.preview_qimage()))
+            self._loaded_entry = entry
+
+        centre_x, centre_y = entry.crop_centre
+        self._pixmap_item.setTransformOriginPoint(QPointF(centre_x, centre_y))
+        self._pixmap_item.setRotation(entry.rotation_deg)
+
+    def _update_overlay(self, entry: ManualSplitEntry) -> None:
+        if not self._crop_rect_item or not self._split_line:
+            return
+
+        rect = QRectF(entry.crop_left, entry.crop_top, entry.current_width, entry.current_height)
+        rect_pen = self._crop_rect_item.pen()
+        rect_pen.setWidth(max(2, int(round(rect.width() / 200)) + 1))
+        self._crop_rect_item.setPen(rect_pen)
+        self._crop_rect_item.setRect(rect)
+
+        split_pen = self._split_line.pen()
+        split_pen.setWidth(max(2, entry.current_width // 200 + 1))
+        self._split_line.setPen(split_pen)
+        self._split_line.setLine(
+            entry.split_x_base, entry.crop_top, entry.split_x_base, entry.crop_bottom
+        )
+
+        self._update_handles(entry, rect)
+
+    def _update_handles(self, entry: ManualSplitEntry, rect: QRectF) -> None:
+        if not self._handles:
+            return
+
+        min_width = 2
+        min_height = 2
+        centre_x = rect.center().x()
+        centre_y = rect.center().y()
+
+        left_handle = self._handles["left"]
+        left_handle.blockSignals(True)
+        left_handle.set_limits(0, max(0.0, entry.crop_right - min_width), centre_y)
+        left_handle.setPos(entry.crop_left, centre_y)
+        left_handle.blockSignals(False)
+        left_handle.setVisible(entry.current_width > min_width)
+
+        right_handle = self._handles["right"]
+        right_handle.blockSignals(True)
+        right_handle.set_limits(entry.crop_left + min_width, entry.width, centre_y)
+        right_handle.setPos(entry.crop_right, centre_y)
+        right_handle.blockSignals(False)
+        right_handle.setVisible(entry.current_width > min_width)
+
+        top_handle = self._handles["top"]
+        top_handle.blockSignals(True)
+        top_handle.set_limits(0, max(0.0, entry.crop_bottom - min_height), centre_x)
+        top_handle.setPos(centre_x, entry.crop_top)
+        top_handle.blockSignals(False)
+        top_handle.setVisible(entry.current_height > min_height)
+
+        bottom_handle = self._handles["bottom"]
+        bottom_handle.blockSignals(True)
+        bottom_handle.set_limits(entry.crop_top + min_height, entry.height, centre_x)
+        bottom_handle.setPos(centre_x, entry.crop_bottom)
+        bottom_handle.blockSignals(False)
+        bottom_handle.setVisible(entry.current_height > min_height)
+
+    def _handle_moved(self, side: str, coordinate: float) -> None:
+        if not self.entries:
+            return
+        entry = self.entries[self.current_index]
+        rounded = int(round(coordinate))
+        if side == "left":
+            self._apply_crop_change(entry, left=rounded)
+        elif side == "right":
+            self._apply_crop_change(entry, right=rounded)
+        elif side == "top":
+            self._apply_crop_change(entry, top=rounded)
+        elif side == "bottom":
+            self._apply_crop_change(entry, bottom=rounded)
+
+    def _apply_crop_change(
+        self,
+        entry: ManualSplitEntry,
+        *,
+        left: int | None = None,
+        right: int | None = None,
+        top: int | None = None,
+        bottom: int | None = None,
+    ) -> None:
+        width = entry.width
+        height = entry.height
+
+        left_val = entry.crop_left if left is None else int(left)
+        right_val = entry.crop_right if right is None else int(right)
+        top_val = entry.crop_top if top is None else int(top)
+        bottom_val = entry.crop_bottom if bottom is None else int(bottom)
+
+        left_val = max(0, min(left_val, width - 1))
+        right_val = max(1, min(right_val, width))
+        top_val = max(0, min(top_val, height - 1))
+        bottom_val = max(1, min(bottom_val, height))
+
+        min_width = 2
+        min_height = 2
+
+        if right_val - left_val < min_width:
+            if left is None:
+                left_val = max(0, right_val - min_width)
+            elif right is None:
+                right_val = min(width, left_val + min_width)
+            else:
+                right_val = min(width, left_val + min_width)
+
+        if bottom_val - top_val < min_height:
+            if top is None:
+                top_val = max(0, bottom_val - min_height)
+            elif bottom is None:
+                bottom_val = min(height, top_val + min_height)
+            else:
+                bottom_val = min(height, top_val + min_height)
+
+        entry.crop_left = left_val
+        entry.crop_right = right_val
+        entry.crop_top = top_val
+        entry.crop_bottom = bottom_val
+
+        entry.update_split_from_ratio()
+        self._sync_controls(entry)
+        self.refresh_scene()
+
+    def _sync_controls(self, entry: ManualSplitEntry) -> None:
+        self._updating = True
+
+        width = entry.width
+        height = entry.height
+
+        self.leftSpin.setMaximum(max(0, width - 1))
+        self.rightSpin.setMaximum(width)
+        self.topSpin.setMaximum(max(0, height - 1))
+        self.bottomSpin.setMaximum(height)
+
+        self.leftSpin.setValue(entry.crop_left)
+        self.rightSpin.setValue(entry.crop_right)
+        self.topSpin.setValue(entry.crop_top)
+        self.bottomSpin.setValue(entry.crop_bottom)
+
+        slider_max = max(0, entry.current_width - 1)
+        self.slider.setMaximum(slider_max)
+        self.slider.setEnabled(slider_max > 0)
+        current_value = min(entry.split_x, slider_max) if slider_max >= 0 else 0
+        self.slider.setValue(current_value)
+
+        self._updating = False
+
+        self.positionLabel.setText(
+            f"Позиция разреза: {entry.split_x}px из {entry.current_width}px"
+        )
+        self.rotationLabel.setText(f"Поворот: {entry.rotation_deg:.2f}°")
+
+    def _update_grid(self, entry: ManualSplitEntry) -> None:
+        for line in self._grid_lines:
+            self.scene.removeItem(line)
+        self._grid_lines.clear()
+
         if not self.gridButton.isChecked():
             return
 
-        pen = QPen(Qt.white)
+        width = entry.current_width
+        height = entry.current_height
+        if width <= 1 or height <= 1:
+            return
+
+        pen = QPen(QColor(255, 255, 255, 180))
         pen.setStyle(Qt.DashLine)
-        pen.setWidth(max(1, width // 500))
-        pen.setColor(Qt.white)
+        pen.setWidth(max(1, width // 200 + 1))
 
-        vertical_step = width / 3.0
-        horizontal_step = height / 3.0
+        left = entry.crop_left
+        right = entry.crop_right
+        top = entry.crop_top
+        bottom = entry.crop_bottom
 
         for i in range(1, 3):
-            x = i * vertical_step
-            line = self.scene.addLine(x, 0, x, height, pen)
+            x = left + width * i / 3.0
+            line = self.scene.addLine(x, top, x, bottom, pen)
             self._grid_lines.append(line)
 
         for i in range(1, 3):
-            y = i * horizontal_step
-            line = self.scene.addLine(0, y, width, y, pen)
+            y = top + height * i / 3.0
+            line = self.scene.addLine(left, y, right, y, pen)
             self._grid_lines.append(line)
+
+    def _update_scene_rect(self) -> None:
+        rect = self.scene.itemsBoundingRect()
+        if rect.isNull():
+            return
+        padding = 40.0
+        rect = rect.adjusted(-padding, -padding, padding, padding)
+        self.scene.setSceneRect(rect)
 
     def closeEvent(self, event):
         if self.fullscreenButton.isChecked():
@@ -456,8 +759,10 @@ def initSplitImage(self):
         self.height_img = 0
 
         for entry in manual_entries:
-            final_image = entry.build_image()
-            result = split_with_fixed_position(final_image, entry.split_x, entry.overlap)
+            final_image = entry.build_processed_image()
+            final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
+            split_position = entry.final_split_position(final_width)
+            result = split_with_fixed_position(final_image, split_position, entry.overlap)
             pages = ((result.left, entry.left_path), (result.right, entry.right_path))
             for page_image, page_path in pages:
                 if self.isPxIdentically:

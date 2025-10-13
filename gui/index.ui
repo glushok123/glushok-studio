@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1320</width>
-    <height>780</height>
+    <height>720</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,120 +15,134 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QMainWindow#MainWindow {
-    background-color: #0d1628;
-    color: #e5ecff;
+    background-color: #f2f4fb;
+    color: #1f2430;
     font-family: "Inter";
     font-size: 11pt;
 }
 
 QLabel {
-    color: #c7d7ff;
+    color: #37405c;
     font-weight: 500;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
 }
 
 QLabel#heading {
-    font-size: 20pt;
+    font-size: 18pt;
     font-weight: 700;
-    color: #7ad7ff;
-    letter-spacing: 0.12em;
+    color: #1f5aa6;
+    letter-spacing: 0.08em;
 }
 
 QGroupBox {
-    border: 1px solid rgba(122, 215, 255, 0.35);
-    border-radius: 14px;
-    background-color: rgba(19, 30, 54, 0.85);
+    border: 1px solid #d1d9ec;
+    border-radius: 12px;
+    background-color: rgba(255, 255, 255, 0.95);
     padding: 14px;
-    margin-top: 18px;
+    margin-top: 16px;
 }
 
 QGroupBox::title {
-    color: #8d9eff;
+    color: #1f5aa6;
     font-weight: 600;
     padding: 0 8px;
 }
 
-QFrame#contentFrame, QFrame#controlPanel, QFrame#previewPanel {
-    background: rgba(10, 20, 36, 0.0);
+QFrame#contentFrame,
+QFrame#controlPanel {
+    background: transparent;
     border: none;
 }
 
-QSpinBox, QDoubleSpinBox, QLineEdit {
-    background: rgba(11, 21, 38, 0.92);
-    border: 1px solid rgba(122, 215, 255, 0.45);
-    border-radius: 10px;
-    padding: 6px 10px;
-    color: #f4f7ff;
+QFrame#previewPanel {
+    background-color: rgba(255, 255, 255, 0.85);
+    border: 1px solid #d1d9ec;
+    border-radius: 12px;
+    padding: 12px;
 }
 
-QSpinBox:focus, QDoubleSpinBox:focus, QLineEdit:focus {
-    border-color: #7ad7ff;
-    box-shadow: 0 0 12px rgba(122, 215, 255, 0.25);
+QScrollArea {
+    background: transparent;
+    border: none;
+}
+
+QSpinBox,
+QDoubleSpinBox,
+QLineEdit {
+    background: #ffffff;
+    border: 1px solid #c3cbe0;
+    border-radius: 10px;
+    padding: 6px 10px;
+    color: #1f2430;
+}
+
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QLineEdit:focus {
+    border-color: #5b82d6;
 }
 
 QCheckBox {
     spacing: 8px;
     font-weight: 500;
-    color: #c7d7ff;
+    color: #3a4462;
 }
 
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
     border-radius: 5px;
-    border: 2px solid rgba(122, 215, 255, 0.6);
-    background: rgba(8, 15, 30, 0.9);
+    border: 2px solid #5b82d6;
+    background: #ffffff;
 }
 
 QCheckBox::indicator:checked {
-    background-color: #7ad7ff;
-    border-color: #7ad7ff;
+    background-color: #5b82d6;
+    border-color: #5b82d6;
 }
 
 QPushButton {
-    background-color: #1c2f52;
+    background-color: #5b82d6;
     border-radius: 12px;
-    border: 2px solid rgba(122, 215, 255, 0.55);
-    padding: 10px 24px;
+    border: 1px solid #4a70ba;
+    padding: 10px 22px;
     font-weight: 600;
-    color: #f4f7ff;
+    color: #ffffff;
     text-transform: uppercase;
 }
 
 QPushButton:hover {
-    background-color: #243a63;
-    border-color: #7ad7ff;
-    color: #7ad7ff;
+    background-color: #6a8ee0;
 }
 
 QPushButton:pressed {
-    background-color: #152745;
+    background-color: #3f63a8;
 }
 
 QProgressBar {
-    background: rgba(11, 21, 38, 0.92);
+    background: #ffffff;
     border-radius: 12px;
-    border: 1px solid rgba(122, 215, 255, 0.35);
-    height: 32px;
-    color: #0d1628;
+    border: 1px solid #d1d9ec;
+    height: 28px;
+    color: #1f2430;
     font-weight: 600;
 }
 
 QProgressBar::chunk {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #7ad7ff, stop:1 #8d9eff);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #5b82d6, stop:1 #7ab1ff);
     border-radius: 10px;
 }
 
 QTabWidget::pane {
-    border: 1px solid rgba(122, 215, 255, 0.35);
+    border: 1px solid #d1d9ec;
     border-radius: 12px;
-    background: rgba(11, 21, 38, 0.65);
+    background: rgba(255, 255, 255, 0.9);
 }
 
 QTabBar::tab {
-    background: rgba(11, 21, 38, 0.85);
-    padding: 8px 22px;
-    color: #c7d7ff;
+    background: rgba(255, 255, 255, 0.85);
+    padding: 8px 18px;
+    color: #44506e;
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
     border: 1px solid transparent;
@@ -136,50 +150,36 @@ QTabBar::tab {
 }
 
 QTabBar::tab:selected {
-    background: rgba(122, 215, 255, 0.2);
-    color: #7ad7ff;
-    border-color: rgba(122, 215, 255, 0.45);
+    background: #5b82d6;
+    color: #ffffff;
+    border-color: #4a70ba;
 }
 
-QListWidget {
-    background: rgba(11, 21, 38, 0.9);
-    border: 1px solid rgba(122, 215, 255, 0.35);
+QListWidget,
+QTextEdit {
+    background: #ffffff;
+    border: 1px solid #d1d9ec;
     border-radius: 12px;
     padding: 8px;
-}
-
-QTextEdit {
-    background: rgba(11, 21, 38, 0.9);
-    border: 1px solid rgba(122, 215, 255, 0.35);
-    border-radius: 12px;
-    padding: 10px;
-    color: #f4f7ff;
+    color: #1f2430;
 }
 
 QScrollBar:vertical {
-    background: rgba(11, 21, 38, 0.8);
+    background: #e4e9f5;
     width: 12px;
-    margin: 4px;
+    margin: 2px;
     border-radius: 6px;
 }
 
 QScrollBar::handle:vertical {
-    background: #7ad7ff;
+    background: #5b82d6;
     border-radius: 6px;
+    min-height: 24px;
 }
 
-QMenuBar {
-    background: transparent;
-    color: #c7d7ff;
-}
-
-QMenuBar::item:selected {
-    background: rgba(122, 215, 255, 0.2);
-}
-
-QStatusBar {
-    background: transparent;
-    color: #7ad7ff;
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    height: 0;
 }
 </string>
   </property>
@@ -227,7 +227,6 @@ QStatusBar {
       <property name="verticalScrollBarPolicy">
        <enum>Qt::ScrollBarAsNeeded</enum>
       </property>
-
       <widget class="QWidget" name="scrollAreaWidgetContents">
        <property name="geometry">
         <rect>
@@ -237,7 +236,6 @@ QStatusBar {
          <height>700</height>
         </rect>
        </property>
-
        <layout class="QVBoxLayout" name="scrollLayout">
         <property name="spacing">
          <number>12</number>
@@ -254,21 +252,370 @@ QStatusBar {
         <property name="bottomMargin">
          <number>0</number>
         </property>
-
         <item>
          <widget class="QFrame" name="contentFrame">
           <layout class="QHBoxLayout" name="contentLayout">
            <property name="spacing">
             <number>22</number>
            </property>
-
            <item>
             <widget class="QFrame" name="controlPanel">
-             <layout class="QVBoxLayout" name="controlLayout">
-              <property name="spacing">
+             <layout class="QGridLayout" name="controlLayout">
+              <property name="horizontalSpacing">
                <number>16</number>
               </property>
-
+              <property name="verticalSpacing">
+               <number>16</number>
+              </property>
+              <item row="0" column="0" colspan="2">
+               <widget class="QGroupBox" name="sourceGroup">
+                <property name="title">
+                 <string>Источник</string>
+                </property>
+                <layout class="QGridLayout" name="gridLayoutSource">
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="labelPathCaption">
+                   <property name="text">
+                    <string>Выбранная папка:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QLabel" name="label_12">
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumHeight">
+                    <number>24</number>
+                   </property>
+                   <property name="text">
+                    <string/>
+                   </property>
+                   <property name="wordWrap">
+                    <bool>true</bool>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="label_2">
+                   <property name="text">
+                    <string>Количество файлов:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QLabel" name="label">
+                   <property name="minimumHeight">
+                    <number>30</number>
+                   </property>
+                   <property name="text">
+                    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:18pt;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QGroupBox" name="processingGroup">
+                <property name="title">
+                 <string>Параметры обработки</string>
+                </property>
+                <layout class="QFormLayout" name="formLayout">
+                 <property name="horizontalSpacing">
+                  <number>14</number>
+                 </property>
+                 <property name="verticalSpacing">
+                  <number>12</number>
+                 </property>
+                 <item row="0" column="0">
+                  <widget class="QLabel" name="labelOverlap">
+                   <property name="text">
+                    <string>Кол. px для нахлёста</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="0" column="1">
+                  <widget class="QSpinBox" name="overlapSpinBox">
+                   <property name="minimum">
+                    <number>0</number>
+                   </property>
+                   <property name="maximum">
+                    <number>2000</number>
+                   </property>
+                   <property name="value">
+                    <number>100</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="0">
+                  <widget class="QLabel" name="labelBorder">
+                   <property name="text">
+                    <string>Кол. px для добавления рамки</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="1" column="1">
+                  <widget class="QSpinBox" name="borderSpinBox">
+                   <property name="minimum">
+                    <number>0</number>
+                   </property>
+                   <property name="maximum">
+                    <number>800</number>
+                   </property>
+                   <property name="value">
+                    <number>50</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="0">
+                  <widget class="QLabel" name="labelDpi">
+                   <property name="text">
+                    <string>DPI</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="2" column="1">
+                  <widget class="QSpinBox" name="dpiSpinBox">
+                   <property name="minimum">
+                    <number>72</number>
+                   </property>
+                   <property name="maximum">
+                    <number>1200</number>
+                   </property>
+                   <property name="value">
+                    <number>400</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="0">
+                  <widget class="QLabel" name="labelStart">
+                   <property name="text">
+                    <string>Кол. px для обнаружения начала листа</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="3" column="1">
+                  <widget class="QSpinBox" name="startSearchSpinBox">
+                   <property name="minimum">
+                    <number>0</number>
+                   </property>
+                   <property name="maximum">
+                    <number>2000</number>
+                   </property>
+                   <property name="value">
+                    <number>300</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="0">
+                  <widget class="QLabel" name="labelMiddle">
+                   <property name="text">
+                    <string>Кол. px для обнаружения середины листа</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="4" column="1">
+                  <widget class="QSpinBox" name="middleSearchSpinBox">
+                   <property name="minimum">
+                    <number>0</number>
+                   </property>
+                   <property name="maximum">
+                    <number>3000</number>
+                   </property>
+                   <property name="value">
+                    <number>450</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="5" column="0">
+                  <widget class="QLabel" name="labelCpu">
+                   <property name="text">
+                    <string>Количество потоков</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="5" column="1">
+                  <widget class="QSpinBox" name="cpuSpinBox">
+                   <property name="minimum">
+                    <number>1</number>
+                   </property>
+                   <property name="maximum">
+                    <number>32</number>
+                   </property>
+                   <property name="value">
+                    <number>4</number>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="6" column="0">
+                  <widget class="QLabel" name="labelWidthCoef">
+                   <property name="text">
+                    <string>Кф. для ширины (удаление рамки)</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="6" column="1">
+                  <widget class="QDoubleSpinBox" name="widthCoefSpinBox">
+                   <property name="decimals">
+                    <number>2</number>
+                   </property>
+                   <property name="singleStep">
+                    <double>0.05</double>
+                   </property>
+                   <property name="minimum">
+                    <double>0.10</double>
+                   </property>
+                   <property name="maximum">
+                    <double>1.00</double>
+                   </property>
+                   <property name="value">
+                    <double>0.60</double>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="7" column="0">
+                  <widget class="QLabel" name="labelHeightCoef">
+                   <property name="text">
+                    <string>Кф. для высоты (удаление рамки)</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item row="7" column="1">
+                  <widget class="QDoubleSpinBox" name="heightCoefSpinBox">
+                   <property name="decimals">
+                    <number>2</number>
+                   </property>
+                   <property name="singleStep">
+                    <double>0.05</double>
+                   </property>
+                   <property name="minimum">
+                    <double>0.10</double>
+                   </property>
+                   <property name="maximum">
+                    <double>1.00</double>
+                   </property>
+                   <property name="value">
+                    <double>0.80</double>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QGroupBox" name="modesGroup">
+                <property name="title">
+                 <string>Опции</string>
+                </property>
+                <layout class="QGridLayout" name="gridLayoutModes">
+             <item row="0" column="0">
+              <widget class="QCheckBox" name="checkBox">
+               <property name="text">
+                <string>Удалять черную рамку</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QCheckBox" name="checkBox_4">
+               <property name="text">
+                <string>Рамка с 4 сторон</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QCheckBox" name="checkBox_3">
+               <property name="text">
+                <string>Делить изображение по полам</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QCheckBox" name="checkBox_2">
+               <property name="text">
+                <string>Добавлять черную рамку (ОБРЕЗКА)</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QCheckBox" name="checkBox_8">
+               <property name="text">
+                <string>Добавлять черную рамку (ЧЕРНЫЙ ФОН)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QCheckBox" name="checkBox_5">
+               <property name="text">
+                <string>Одинаковое разрешение</string>
+               </property>
+              </widget>
+             </item>
+            <item row="3" column="0" colspan="2">
+             <widget class="QCheckBox" name="checkBox_9">
+              <property name="text">
+               <string>Ручная корректировка середины изображения</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QCheckBox" name="checkBox_6">
+              <property name="text">
+               <string>Показывать изначальные сканы</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QCheckBox" name="checkBox_7">
+              <property name="text">
+               <string>Показывать готовые сканы</string>
+              </property>
+             </widget>
+            </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="2" column="0" colspan="2">
+           <widget class="QPushButton" name="pushButton">
+            <property name="minimumHeight">
+             <number>48</number>
+            </property>
+            <property name="text">
+             <string>Выполнить</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="previewPanel">
+         <layout class="QVBoxLayout" name="previewLayout">
+          <property name="spacing">
+           <number>16</number>
+          </property>
+          <item>
+           <widget class="QTabWidget" name="tabWidget">
+            <property name="currentIndex">
+             <number>0</number>
+            </property>
+            <widget class="QWidget" name="tabQueue">
+             <attribute name="title">
+              <string>Очередь</string>
+             </attribute>
+             <layout class="QVBoxLayout" name="verticalLayoutQueue">
               <item>
                <widget class="QGroupBox" name="sourceGroup">
                 <property name="title">
