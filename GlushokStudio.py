@@ -4,13 +4,20 @@ import shutil
 import sys
 import re
 import tempfile
+import traceback
+import faulthandler
 from PyQt5 import uic, QtCore, QtGui
 from PyQt5.QtGui import QTextCursor, QIcon, QImage
 from PyQt5.QtWidgets import *
-from threading import Thread
 from module.ThreadStart import ThreadStart
 from PyQt5.QtGui import QMovie, QColor
 from functools import partial
+
+try:
+    faulthandler.enable()
+except Exception:
+    # На некоторых сборках PyInstaller stderr может быть недоступен.
+    pass
 
 #pyinstaller --onefile  .\GlushokStudio.py
 
@@ -86,6 +93,22 @@ def load_ui_with_repair(ui_path: str, baseinstance: QMainWindow) -> None:
         repaired_path = ensure_ui_is_wellformed(ui_path)
         loadUi(repaired_path, baseinstance)
 
+
+def install_global_exception_hook() -> None:
+    """Print uncaught exceptions to stderr instead of silently exiting."""
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        print("[ERROR] Необработанное исключение:", file=sys.stderr)
+        traceback.print_exception(exc_type, exc_value, exc_traceback)
+
+    sys.excepthook = handle_exception
+
+
+install_global_exception_hook()
+
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -116,6 +139,7 @@ class MainApp(QMainWindow):
         self.isAddBorderForAll = True
         self.isAddBlackBorder = False
         self.isPxIdentically = False
+        self._activeManualDialog = None
 
         # Пути к helper-функциям из module.helper и module.addListWidget
         from module.helper import statusLoaded, updateLog, setParamsUi, Clicked, getUrl, prepeaImageEnd
@@ -345,7 +369,9 @@ class MainApp(QMainWindow):
         self.threadStart.log.connect(self.updateLog)
 
         # Ручная корректировка разделения
-        self.threadStart.manualAdjustmentRequested.connect(self.handleManualSplitAdjustment)
+        self.threadStart.manualAdjustmentRequested.connect(
+            self.handleManualSplitAdjustment,
+        )
 
         # Сигнал прогресса
         self.threadStart.proc.connect(lambda p, folder=path: self.updateFolderStatus(folder, 'Обрабатывается', p))
@@ -364,23 +390,48 @@ class MainApp(QMainWindow):
         from module.splitImage import ManualSplitDialog
 
         entries = []
-        event = None
+        wait_event = None
+        result_holder = None
         if isinstance(payload, dict):
-            entries = payload.get('entries') or []
-            event = payload.get('event')
+            entries = list(payload.get('entries') or [])
+            wait_event = payload.get('wait_event')
+            result_holder = payload.get('result')
 
-        try:
-            if not entries:
-                return
+        def finalize(accepted: bool) -> None:
+            if result_holder is not None:
+                result_holder['accepted'] = bool(accepted)
+            if wait_event is not None:
+                wait_event.set()
 
-            dialog = ManualSplitDialog(entries, parent=self)
-            result = dialog.exec_()
-            if result != QDialog.Accepted:
+        if not entries:
+            finalize(True)
+            return
+
+        def open_dialog():
+            accepted = False
+            try:
+                print(f"[INFO] Открытие окна ручной корректировки ({len(entries)} элементов)")
+                dialog = ManualSplitDialog(entries, parent=self)
+                self._activeManualDialog = dialog
+                result = dialog.exec_()
+                accepted = result == QDialog.Accepted
+                if not accepted:
+                    for entry in entries:
+                        entry.split_x = entry.auto_split_x
+                    print("[WARN] Пользователь отменил ручную корректировку, применены авто-параметры")
+            except Exception as exc:
+                error_text = f"Ошибка при открытии окна ручной корректировки: {exc}"
+                self.updateLog(error_text)
+                tb = traceback.format_exc()
+                print(error_text, file=sys.stderr)
+                print(tb, file=sys.stderr)
                 for entry in entries:
                     entry.split_x = entry.auto_split_x
-        finally:
-            if event is not None:
-                event.set()
+            finally:
+                self._activeManualDialog = None
+                finalize(accepted)
+
+        QtCore.QTimer.singleShot(0, open_dialog)
 
     def finishFolder(self, path):
         """
@@ -411,3 +462,4 @@ if __name__ == '__main__':
     ex = MainApp()
     ex.show()
     sys.exit(app.exec_())
+

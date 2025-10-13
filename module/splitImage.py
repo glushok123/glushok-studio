@@ -1,8 +1,8 @@
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from threading import Event
 from typing import List
+from threading import Event
 
 import cv2
 import numpy as np
@@ -746,14 +746,25 @@ def initSplitImage(self):
     if getattr(self, "isManualSplitAdjust", False) and manual_entries:
         if hasattr(self, "log"):
             self.log.emit("Ожидание ручной корректировки середины")
+        print(f"[INFO] Найдено {len(manual_entries)} файлов для ручной корректировки")
 
         wait_event = Event()
-        payload = {"entries": manual_entries, "event": wait_event}
+        result_holder = {"accepted": False}
+        payload = {
+            "entries": manual_entries,
+            "wait_event": wait_event,
+            "result": result_holder,
+        }
         self.manualAdjustmentRequested.emit(payload)
         wait_event.wait()
+        accepted = bool(result_holder.get("accepted"))
+        print("[INFO] Слот ручной корректировки завершил работу")
 
         if hasattr(self, "log"):
+            status = "принята" if accepted else "отменена"
+            self.log.emit(f"Ручная корректировка {status}, продолжаем обработку")
             self.log.emit("Сохранение результатов ручной корректировки")
+        print(f"[INFO] Ручная корректировка { 'принята' if accepted else 'отменена' }")
 
         self.width_img = 0
         self.height_img = 0
