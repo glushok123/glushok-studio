@@ -387,27 +387,104 @@ class MainApp(QMainWindow):
         self.updateLog(f"Начата обработка папки: {path}")
 
     def handleManualSplitAdjustment(self, payload):
-        from module.splitImage import ManualSplitDialog
+        from pathlib import Path
 
-        entries = []
+        import numpy as np
+
+        from module.splitImage import (
+            ManualSplitDialog,
+            ManualSplitEntry,
+            _fit_page_to_canvas,
+            split_with_fixed_position,
+        )
+        from module.image_utils import save_with_dpi
+
+        raw_entries = []
         wait_event = None
         result_holder = None
+        worker_thread = None
         if isinstance(payload, dict):
-            entries = list(payload.get('entries') or [])
+            raw_entries = list(payload.get('entries') or [])
             wait_event = payload.get('wait_event')
             result_holder = payload.get('result')
+            worker_thread = payload.get('thread')
 
-        def finalize(accepted: bool) -> None:
+        def finalize(accepted: bool, width_img: int | None = None, height_img: int | None = None) -> None:
             if result_holder is not None:
                 result_holder['accepted'] = bool(accepted)
+                if width_img is not None:
+                    result_holder['width_img'] = width_img
+                if height_img is not None:
+                    result_holder['height_img'] = height_img
             if wait_event is not None:
                 wait_event.set()
 
-        if not entries:
+        if not raw_entries:
             finalize(True)
             return
 
+        gui_thread = QtCore.QThread.currentThread()
+        app = QApplication.instance()
+        app_thread = app.thread() if app else None
+        if app_thread is not None and gui_thread is not app_thread:
+            QtCore.QTimer.singleShot(0, lambda: self.handleManualSplitAdjustment(payload))
+            return
+
+        def reconstruct_entries():
+            prepared = []
+            for index, data in enumerate(raw_entries, start=1):
+                try:
+                    shape = tuple(int(dim) for dim in data.get('image_shape', ()) or ())
+                    dtype_str = data.get('image_dtype')
+                    image_bytes = data.get('image_bytes', b'')
+                    if not shape or not dtype_str or not image_bytes:
+                        raise ValueError('Недостаточно данных для изображения')
+                    dtype = np.dtype(dtype_str)
+                    expected = int(np.prod(shape)) * dtype.itemsize
+                    if len(image_bytes) < expected:
+                        raise ValueError('Размер буфера меньше ожидаемого')
+                    buffer = np.frombuffer(image_bytes, dtype=dtype)
+                    if buffer.size != int(np.prod(shape)):
+                        raise ValueError('Размер буфера не соответствует форме')
+                    base_image = buffer.reshape(shape).copy()
+                    entry = ManualSplitEntry(
+                        relative=Path(data.get('relative', '')),
+                        target_dir=Path(data.get('target_dir', '.')),
+                        base_image=base_image,
+                        left_path=Path(data.get('left_path', '')),
+                        right_path=Path(data.get('right_path', '')),
+                        auto_split_x=int(data.get('auto_split_x', 0)),
+                        split_x=int(data.get('split_x', data.get('auto_split_x', 0))),
+                        overlap=int(data.get('overlap', 0)),
+                        crop_left=int(data.get('crop_left', 0)),
+                        crop_top=int(data.get('crop_top', 0)),
+                        crop_right=int(data.get('crop_right', base_image.shape[1])),
+                        crop_bottom=int(data.get('crop_bottom', base_image.shape[0])),
+                        rotation_deg=float(data.get('rotation_deg', 0.0)),
+                    )
+                except Exception as exc:
+                    message = f"[WARN] Не удалось подготовить запись #{index} для ручной корректировки: {exc}"
+                    print(message)
+                    self.updateLog(message)
+                    continue
+                prepared.append(entry)
+            return prepared
+
+        entries = reconstruct_entries()
+        raw_entries.clear()
+
+        if not entries:
+            print('[WARN] Нет доступных изображений для ручной корректировки после подготовки')
+            finalize(True)
+            return
+
+        dpi_value = getattr(worker_thread, 'dpi', self.dpi)
+        is_px_identically = bool(getattr(worker_thread, 'isPxIdentically', False))
+        width_img = int(getattr(worker_thread, 'width_img', 0) or 0)
+        height_img = int(getattr(worker_thread, 'height_img', 0) or 0)
+
         def open_dialog():
+            nonlocal width_img, height_img
             accepted = False
             try:
                 print(f"[INFO] Открытие окна ручной корректировки ({len(entries)} элементов)")
@@ -417,19 +494,38 @@ class MainApp(QMainWindow):
                 accepted = result == QDialog.Accepted
                 if not accepted:
                     for entry in entries:
-                        entry.split_x = entry.auto_split_x
+                        entry.set_split_x(int(entry.auto_split_x))
                     print("[WARN] Пользователь отменил ручную корректировку, применены авто-параметры")
+
+                for entry in entries:
+                    entry.target_dir.mkdir(parents=True, exist_ok=True)
+                    final_image = entry.build_processed_image()
+                    final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
+                    split_position = entry.final_split_position(final_width)
+                    result = split_with_fixed_position(final_image, split_position, entry.overlap)
+                    for page_image, page_path in ((result.left, entry.left_path), (result.right, entry.right_path)):
+                        page_path.parent.mkdir(parents=True, exist_ok=True)
+                        if is_px_identically:
+                            if width_img and height_img:
+                                page_image = _fit_page_to_canvas(page_image, width_img, height_img)
+                            else:
+                                width_img = page_image.shape[1] if page_image.ndim >= 2 else 0
+                                height_img = page_image.shape[0] if page_image.ndim >= 2 else 0
+                        save_with_dpi(page_image, page_path, dpi_value)
+
+                if worker_thread is not None:
+                    worker_thread.width_img = width_img
+                    worker_thread.height_img = height_img
             except Exception as exc:
-                error_text = f"Ошибка при открытии окна ручной корректировки: {exc}"
+                error_text = f"Ошибка при обработке ручной корректировки: {exc}"
                 self.updateLog(error_text)
                 tb = traceback.format_exc()
                 print(error_text, file=sys.stderr)
                 print(tb, file=sys.stderr)
-                for entry in entries:
-                    entry.split_x = entry.auto_split_x
+                accepted = False
             finally:
                 self._activeManualDialog = None
-                finalize(accepted)
+                finalize(accepted, width_img, height_img)
 
         QtCore.QTimer.singleShot(0, open_dialog)
 

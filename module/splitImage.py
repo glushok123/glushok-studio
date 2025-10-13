@@ -749,15 +749,26 @@ def initSplitImage(self):
         print(f"[INFO] Найдено {len(manual_entries)} файлов для ручной корректировки")
 
         wait_event = Event()
-        result_holder = {"accepted": False}
+        result_holder = {"accepted": False, "width_img": self.width_img, "height_img": self.height_img}
         payload = {
             "entries": manual_entries,
             "wait_event": wait_event,
             "result": result_holder,
+            "thread": self,
         }
         self.manualAdjustmentRequested.emit(payload)
         wait_event.wait()
         accepted = bool(result_holder.get("accepted"))
+        if "width_img" in result_holder:
+            try:
+                self.width_img = int(result_holder["width_img"] or 0)
+            except Exception:
+                pass
+        if "height_img" in result_holder:
+            try:
+                self.height_img = int(result_holder["height_img"] or 0)
+            except Exception:
+                pass
         print("[INFO] Слот ручной корректировки завершил работу")
 
         if hasattr(self, "log"):
@@ -765,24 +776,6 @@ def initSplitImage(self):
             self.log.emit(f"Ручная корректировка {status}, продолжаем обработку")
             self.log.emit("Сохранение результатов ручной корректировки")
         print(f"[INFO] Ручная корректировка { 'принята' if accepted else 'отменена' }")
-
-        self.width_img = 0
-        self.height_img = 0
-
-        for entry in manual_entries:
-            final_image = entry.build_processed_image()
-            final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
-            split_position = entry.final_split_position(final_width)
-            result = split_with_fixed_position(final_image, split_position, entry.overlap)
-            pages = ((result.left, entry.left_path), (result.right, entry.right_path))
-            for page_image, page_path in pages:
-                if self.isPxIdentically:
-                    if self.width_img and self.height_img:
-                        page_image = _fit_page_to_canvas(page_image, self.width_img, self.height_img)
-                    else:
-                        self.width_img, self.height_img = page_image.shape[1], page_image.shape[0]
-
-                save_with_dpi(page_image, page_path, self.dpi)
 
         self._manual_split_entries = []
 
@@ -854,21 +847,26 @@ def parseImage(self, file_path: Path) -> str | None:
         if not hasattr(self, "_manual_split_entries"):
             self._manual_split_entries = []
 
-        entry = ManualSplitEntry(
-            relative=relative,
-            target_dir=target_dir,
-            base_image=image.copy(),
-            left_path=left_path,
-            right_path=right_path,
-            auto_split_x=spread.split_x,
-            split_x=spread.split_x,
-            overlap=self.width_px,
-            crop_left=0,
-            crop_top=0,
-            crop_right=image.shape[1],
-            crop_bottom=image.shape[0],
-        )
-        self._manual_split_entries.append(entry)
+        image_payload = np.ascontiguousarray(image)
+        entry_data = {
+            "source_path": str(file_path),
+            "relative": str(relative),
+            "target_dir": str(target_dir),
+            "left_path": str(left_path),
+            "right_path": str(right_path),
+            "auto_split_x": int(spread.split_x),
+            "split_x": int(spread.split_x),
+            "overlap": int(self.width_px),
+            "crop_left": 0,
+            "crop_top": 0,
+            "crop_right": int(image_payload.shape[1]),
+            "crop_bottom": int(image_payload.shape[0]),
+            "rotation_deg": 0.0,
+            "image_shape": tuple(int(dim) for dim in image_payload.shape),
+            "image_dtype": image_payload.dtype.str,
+            "image_bytes": image_payload.tobytes(),
+        }
+        self._manual_split_entries.append(entry_data)
         return str(file_path)
 
     for page_image, page_path in ((spread.left, left_path), (spread.right, right_path)):
