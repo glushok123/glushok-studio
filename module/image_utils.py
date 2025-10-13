@@ -119,16 +119,80 @@ def detect_content_bounds(gray: np.ndarray) -> BoundingBox | None:
     if gray.ndim != 2:
         raise ValueError("detect_content_bounds expects a single channel image")
 
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    height, width = gray.shape
+    image_area = float(width * height)
+    if image_area == 0:
+        return None
 
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Heuristic: if most of the page ended up black (e.g. the scan is dark),
+    # invert the mask so that the document becomes the bright region.
+    white_ratio = cv2.countNonZero(thresh) / image_area
+    if white_ratio < 0.1:
+        thresh = cv2.bitwise_not(thresh)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(cleaned, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
 
-    contour = max(contours, key=cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(contour)
-    return BoundingBox(left=x, top=y, right=x + w, bottom=y + h)
+    min_area = image_area * 0.01
+    boxes: list[BoundingBox] = []
+    for contour in contours:
+        if cv2.contourArea(contour) < min_area:
+            continue
+        x, y, w, h = cv2.boundingRect(contour)
+        boxes.append(BoundingBox(left=x, top=y, right=x + w, bottom=y + h))
+
+    if not boxes:
+        contour = max(contours, key=cv2.contourArea)
+        x, y, w, h = cv2.boundingRect(contour)
+        boxes.append(BoundingBox(left=x, top=y, right=x + w, bottom=y + h))
+
+    left = min(box.left for box in boxes)
+    top = min(box.top for box in boxes)
+    right = max(box.right for box in boxes)
+    bottom = max(box.bottom for box in boxes)
+
+    left = int(np.clip(left, 0, width))
+    top = int(np.clip(top, 0, height))
+    right = int(np.clip(right, left, width))
+    bottom = int(np.clip(bottom, top, height))
+
+    if right - left <= 0 or bottom - top <= 0:
+        return None
+
+    return BoundingBox(left=left, top=top, right=right, bottom=bottom)
+
+
+def crop_to_content(
+    image: np.ndarray,
+    pad_x: int = 0,
+    pad_y: int = 0,
+    bounds: BoundingBox | None = None,
+) -> tuple[np.ndarray, BoundingBox] | tuple[None, None]:
+    """Crop *image* to the detected document bounds and return the crop."""
+
+    if bounds is None:
+        if image.ndim == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
+
+        bounds = detect_content_bounds(gray)
+    if bounds is None:
+        return None, None
+
+    expanded = bounds.expand(image.shape, pad_x, pad_y)
+    if expanded.width <= 0 or expanded.height <= 0:
+        return None, None
+
+    cropped = image[expanded.top : expanded.bottom, expanded.left : expanded.right]
+    return cropped, expanded
 
 
 @dataclass(frozen=True)
@@ -138,60 +202,80 @@ class SplitResult:
     split_x: int
 
 
-def find_split_column(gray: np.ndarray, window_ratio: float = 0.08) -> int:
+def _project_text_density(gray: np.ndarray) -> np.ndarray:
+    """Return text density projection for each column of ``gray`` image.
+
+    The helper binarises the image and counts how many dark (text) pixels are in
+    each column.  Low values indicate blank space such as the gutter.
+    """
+
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    _, binary = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    white_ratio = cv2.countNonZero(binary) / max(1, gray.size)
+    if white_ratio < 0.5:
+        binary = cv2.bitwise_not(binary)
+
+    text_mask = 255 - binary
+    projection = text_mask.mean(axis=0)
+    return projection
+
+
+def find_split_column(
+    gray: np.ndarray,
+    window_ratio: float = 0.08,
+    search_radius: int | None = None,
+) -> tuple[int, bool]:
     """Detect the most probable gutter position for a spread ``gray`` image.
 
-    The algorithm projects pixel intensities along the X axis and searches for
-    the lightest column close to the centre.  It proved to be far more stable
-    than the old custom heuristics and never returns an index outside the image
-    bounds.
+    Returns a tuple ``(position, is_confident)``.  When ``is_confident`` is
+    ``False`` the caller should ignore the detected position and fall back to a
+    neutral split (for example the physical centre of the image).
     """
-    height, width = gray.shape
-    projection = gray.mean(axis=0)
+
+    _, width = gray.shape
+    projection = _project_text_density(gray)
+
     window = max(3, int(width * window_ratio) | 1)
     kernel = np.ones(window, dtype=np.float32) / window
     smoothed = np.convolve(projection, kernel, mode="same")
 
     centre = width // 2
-    radius = max(width // 6, window)
+    if search_radius is None or search_radius <= 0:
+        radius = max(width // 6, window)
+    else:
+        radius = max(window, int(search_radius))
+
     start = max(0, centre - radius)
     end = min(width, centre + radius)
-    if start >= end:
-        return centre
+    if end - start <= 1:
+        return centre, False
 
     slice_projection = smoothed[start:end]
     local_index = int(np.argmin(slice_projection))
     split_x = start + local_index
-    return int(np.clip(split_x, 0, width - 1))
+
+    local_min = float(slice_projection[local_index])
+    local_mean = float(slice_projection.mean())
+    local_std = float(slice_projection.std())
+
+    deviation = local_mean - local_min
+    relative_drop = deviation / (local_mean + 1e-6)
+    z_score = deviation / (local_std + 1e-6) if local_std > 1e-6 else 0.0
+
+    is_confident = (
+        local_min <= 5.0
+        or relative_drop >= 0.3
+        or z_score >= 1.0
+    )
+
+    return int(np.clip(split_x, 0, width - 1)), bool(is_confident)
 
 
-def split_spread(image: np.ndarray, overlap: int) -> SplitResult:
-    """Split a double-page spread *image* into two halves with *overlap* pixels.
+def _build_split_result(colour: np.ndarray, split_x: int, overlap: int) -> SplitResult:
+    """Create a :class:`SplitResult` using a fixed ``split_x`` position."""
 
-    The function keeps the pages symmetric: both parts contain the shared
-    gutter area, so the user can later decide what to keep when performing
-    manual post-processing.
-    """
-    if image.ndim == 2:
-        gray = image
-        colour = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-    else:
-        colour = image
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    height, width = gray.shape
-
-    bounds = detect_content_bounds(gray)
-    if bounds and bounds.width > 0 and bounds.height > 0:
-        crop = gray[bounds.top : bounds.bottom, bounds.left : bounds.right]
-        if crop.size:
-            local_split = find_split_column(crop)
-            split_x = bounds.left + local_split
-        else:
-            split_x = find_split_column(gray)
-    else:
-        split_x = find_split_column(gray)
-
+    height, width = colour.shape[:2]
     split_x = int(np.clip(split_x, 0, width - 1))
 
     overlap = max(0, int(overlap))
@@ -208,3 +292,56 @@ def split_spread(image: np.ndarray, overlap: int) -> SplitResult:
         split_x = half
 
     return SplitResult(left=left_page, right=right_page, split_x=split_x)
+
+
+def split_spread(image: np.ndarray, overlap: int, centre_tolerance: int = 0) -> SplitResult:
+    """Split a double-page spread *image* into two halves with *overlap* pixels.
+
+    The function keeps the pages symmetric: both parts contain the shared
+    gutter area, so the user can later decide what to keep when performing
+    manual post-processing.
+    """
+    if image.ndim == 2:
+        gray = image
+        colour = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    else:
+        colour = image
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    height, width = gray.shape
+
+    search_radius = max(0, int(centre_tolerance)) if centre_tolerance else None
+
+    bounds = detect_content_bounds(gray)
+    split_x = width // 2
+    has_gutter = False
+
+    if bounds and bounds.width > 0 and bounds.height > 0:
+        crop = gray[bounds.top : bounds.bottom, bounds.left : bounds.right]
+        if crop.size:
+            local_split, has_gutter = find_split_column(crop, search_radius=search_radius)
+            split_x = bounds.left + local_split
+    if not has_gutter:
+        split_x_candidate, has_gutter = find_split_column(gray, search_radius=search_radius)
+        split_x = split_x_candidate if has_gutter else split_x
+
+    centre = width // 2
+    tolerance = max(0, int(centre_tolerance))
+    if tolerance and abs(split_x - centre) > tolerance:
+        has_gutter = False
+
+    if not has_gutter:
+        split_x = centre
+
+    return _build_split_result(colour, split_x, overlap)
+
+
+def split_with_fixed_position(image: np.ndarray, split_x: int, overlap: int) -> SplitResult:
+    """Split ``image`` using an explicitly supplied ``split_x`` gutter."""
+
+    if image.ndim == 2:
+        colour = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    else:
+        colour = image
+
+    return _build_split_result(colour, split_x, overlap)
