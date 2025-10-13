@@ -290,6 +290,7 @@ class ManualSplitDialog(QDialog):
         self._loaded_entry: ManualSplitEntry | None = None
         self._updating = False
         self._last_loaded_index: int | None = None
+        self._handling_crop_change = False
 
         self.setWindowTitle("Ручная корректировка середины")
         self.resize(900, 600)
@@ -622,7 +623,7 @@ class ManualSplitDialog(QDialog):
         bottom_handle.setVisible(entry.current_height > min_height)
 
     def _handle_moved(self, side: str, coordinate: float) -> None:
-        if not self.entries:
+        if not self.entries or self._handling_crop_change:
             return
         entry = self.entries[self.current_index]
         rounded = int(round(coordinate))
@@ -644,46 +645,53 @@ class ManualSplitDialog(QDialog):
         top: int | None = None,
         bottom: int | None = None,
     ) -> None:
-        width = entry.width
-        height = entry.height
+        if self._handling_crop_change:
+            return
 
-        left_val = entry.crop_left if left is None else int(left)
-        right_val = entry.crop_right if right is None else int(right)
-        top_val = entry.crop_top if top is None else int(top)
-        bottom_val = entry.crop_bottom if bottom is None else int(bottom)
+        self._handling_crop_change = True
+        try:
+            width = entry.width
+            height = entry.height
 
-        left_val = max(0, min(left_val, width - 1))
-        right_val = max(1, min(right_val, width))
-        top_val = max(0, min(top_val, height - 1))
-        bottom_val = max(1, min(bottom_val, height))
+            left_val = entry.crop_left if left is None else int(left)
+            right_val = entry.crop_right if right is None else int(right)
+            top_val = entry.crop_top if top is None else int(top)
+            bottom_val = entry.crop_bottom if bottom is None else int(bottom)
 
-        min_width = 2
-        min_height = 2
+            left_val = max(0, min(left_val, width - 1))
+            right_val = max(1, min(right_val, width))
+            top_val = max(0, min(top_val, height - 1))
+            bottom_val = max(1, min(bottom_val, height))
 
-        if right_val - left_val < min_width:
-            if left is None:
-                left_val = max(0, right_val - min_width)
-            elif right is None:
-                right_val = min(width, left_val + min_width)
-            else:
-                right_val = min(width, left_val + min_width)
+            min_width = 2
+            min_height = 2
 
-        if bottom_val - top_val < min_height:
-            if top is None:
-                top_val = max(0, bottom_val - min_height)
-            elif bottom is None:
-                bottom_val = min(height, top_val + min_height)
-            else:
-                bottom_val = min(height, top_val + min_height)
+            if right_val - left_val < min_width:
+                if left is None:
+                    left_val = max(0, right_val - min_width)
+                elif right is None:
+                    right_val = min(width, left_val + min_width)
+                else:
+                    right_val = min(width, left_val + min_width)
 
-        entry.crop_left = left_val
-        entry.crop_right = right_val
-        entry.crop_top = top_val
-        entry.crop_bottom = bottom_val
+            if bottom_val - top_val < min_height:
+                if top is None:
+                    top_val = max(0, bottom_val - min_height)
+                elif bottom is None:
+                    bottom_val = min(height, top_val + min_height)
+                else:
+                    bottom_val = min(height, top_val + min_height)
 
-        entry.update_split_from_ratio()
-        self._sync_controls(entry)
-        self.refresh_scene()
+            entry.crop_left = left_val
+            entry.crop_right = right_val
+            entry.crop_top = top_val
+            entry.crop_bottom = bottom_val
+
+            entry.update_split_from_ratio()
+            self._sync_controls(entry)
+            self.refresh_scene()
+        finally:
+            self._handling_crop_change = False
 
     def _sync_controls(self, entry: ManualSplitEntry) -> None:
         self._updating = True
