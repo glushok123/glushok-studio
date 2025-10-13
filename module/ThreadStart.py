@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from threading import Thread
 from PyQt5.QtCore import QThread, pyqtSignal
 import os
 import shutil
@@ -247,20 +246,13 @@ class ThreadStart(QThread):
 
                 if self.isRemoveBorder:
                     self.log.emit("START УДАЛЕНИЯ РАМКИ")
-
-                    t1 = Thread(target=self.initRemoveBorder, daemon=True)
-                    t1.start()
-                    t1.join()
-
+                    self.initRemoveBorder()
                     self.log.emit("STOP УДАЛЕНИЯ РАМКИ")
                     self.fileurl = self.dirInit
 
                 if self.isSplit:
                     self.log.emit("START РАЗДЕЛЕНИЕ ПО СТРАНИЦАМ")
-
-                    t1 = Thread(target=self.initSplitImage, daemon=True)
-                    t1.start()
-                    t1.join()
+                    self.initSplitImage()
 
                     dir = os.path.abspath(os.curdir)
                     dir = dir.replace('\\', '/')
@@ -270,20 +262,12 @@ class ThreadStart(QThread):
 
                 if self.isRemoveBorder and self.isAddBlackBorder:
                     self.log.emit("START УДАЛЕНИЯ РАМКИ ДОП")
-
-                    t1 = Thread(target=self.initRemovePostBorder, daemon=True)
-                    t1.start()
-                    t1.join()
-
+                    self.initRemovePostBorder()
                     self.log.emit("STOP УДАЛЕНИЯ РАМКИ ДОП")
 
                 if self.isAddBlackBorder:
                     self.log.emit("START ДОБАВЛЕНИЯ РАМКИ")
-
-                    t1 = Thread(target=self.initAddBorder, daemon=True)
-                    t1.start()
-                    t1.join()
-
+                    self.initAddBorder()
                     self.log.emit("STOP ДОБАВЛЕНИЯ РАМКИ")
                     self.fileurl = self.dirInit
 
@@ -314,20 +298,13 @@ class ThreadStart(QThread):
 
             if self.isRemoveBorder:
                 self.log.emit("START УДАЛЕНИЯ РАМКИ")
-
-                t1 = Thread(target=self.initRemoveBorder, daemon=True)
-                t1.start()
-                t1.join()
-
+                self.initRemoveBorder()
                 self.log.emit("STOP УДАЛЕНИЯ РАМКИ")
                 self.fileurl = self.dirInit
 
             if self.isSplit:
                 self.log.emit("START РАЗДЕЛЕНИЕ ПО СТРАНИЦАМ")
-
-                t1 = Thread(target=self.initSplitImage, daemon=True)
-                t1.start()
-                t1.join()
+                self.initSplitImage()
 
                 dir = os.path.abspath(os.curdir)
                 dir = dir.replace('\\', '/')
@@ -337,20 +314,12 @@ class ThreadStart(QThread):
 
             if self.isRemoveBorder and self.isAddBlackBorder:
                 self.log.emit("START УДАЛЕНИЯ РАМКИ ДОП")
-
-                t1 = Thread(target=self.initRemovePostBorder, daemon=True)
-                t1.start()
-                t1.join()
-
+                self.initRemovePostBorder()
                 self.log.emit("STOP УДАЛЕНИЯ РАМКИ ДОП")
 
             if self.isAddBlackBorder:
                 self.log.emit("START ДОБАВЛЕНИЯ РАМКИ")
-
-                t1 = Thread(target=self.initAddBorder, daemon=True)
-                t1.start()
-                t1.join()
-
+                self.initAddBorder()
                 self.log.emit("STOP ДОБАВЛЕНИЯ РАМКИ")
                 self.fileurl = self.dirInit
 
