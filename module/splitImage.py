@@ -165,7 +165,15 @@ class ManualSplitEntry:
         height, width = crop.shape[:2]
         centre = (width / 2.0, height / 2.0)
 
-        matrix = cv2.getRotationMatrix2D(centre, self.rotation_deg, 1.0)
+        # ``QGraphicsItem`` uses a screen coordinate system where positive
+        # angles rotate the pixmap clockwise.  OpenCV, on the other hand,
+        # interprets positive angles as counter-clockwise rotations.  Without
+        # compensating for the sign difference the preview inside the manual
+        # adjustment dialog does not match the saved image – pages rotated to
+        # the right end up rotated to the left after export.  Negating the
+        # angle here keeps the on-screen transform and the saved result in
+        # sync.
+        matrix = cv2.getRotationMatrix2D(centre, -self.rotation_deg, 1.0)
         cos = abs(matrix[0, 0])
         sin = abs(matrix[0, 1])
 
