@@ -171,17 +171,19 @@ class ManualSplitEntry:
 
     def build_processed_image(self) -> np.ndarray:
         base = self.ensure_loaded()
-        crop_view = base[self.crop_top : self.crop_bottom, self.crop_left : self.crop_right]
-        if not crop_view.size:
+        left = max(0, min(int(self.crop_left), base.shape[1] - 1))
+        right = max(left + 1, min(int(self.crop_right), base.shape[1]))
+        top = max(0, min(int(self.crop_top), base.shape[0] - 1))
+        bottom = max(top + 1, min(int(self.crop_bottom), base.shape[0]))
+
+        if right <= left or bottom <= top:
             return base.copy()
 
-        crop = crop_view.copy()
-
         if abs(self.rotation_deg) < 1e-3:
-            return crop
+            return base[top:bottom, left:right].copy()
 
-        height, width = crop.shape[:2]
-        centre = (width / 2.0, height / 2.0)
+        centre_x, centre_y = self.crop_centre
+        centre = (float(centre_x), float(centre_y))
 
         # ``QGraphicsItem`` uses a screen coordinate system where positive
         # angles rotate the pixmap clockwise.  OpenCV, on the other hand,
@@ -192,17 +194,33 @@ class ManualSplitEntry:
         # angle here keeps the on-screen transform and the saved result in
         # sync.
         matrix = cv2.getRotationMatrix2D(centre, -self.rotation_deg, 1.0)
-        cos = abs(matrix[0, 0])
-        sin = abs(matrix[0, 1])
 
-        new_width = int(np.ceil(width * cos + height * sin))
-        new_height = int(np.ceil(width * sin + height * cos))
+        height, width = base.shape[:2]
+        corners = np.array(
+            [
+                [0.0, 0.0, 1.0],
+                [float(width), 0.0, 1.0],
+                [float(width), float(height), 1.0],
+                [0.0, float(height), 1.0],
+            ],
+            dtype=np.float32,
+        )
+        rotated_corners = (matrix @ corners.T).T
+        min_x = float(rotated_corners[:, 0].min())
+        max_x = float(rotated_corners[:, 0].max())
+        min_y = float(rotated_corners[:, 1].min())
+        max_y = float(rotated_corners[:, 1].max())
 
-        matrix[0, 2] += new_width / 2.0 - centre[0]
-        matrix[1, 2] += new_height / 2.0 - centre[1]
+        new_width = int(np.ceil(max_x - min_x))
+        new_height = int(np.ceil(max_y - min_y))
+        if new_width <= 0 or new_height <= 0:
+            return base[top:bottom, left:right].copy()
+
+        matrix[0, 2] -= min_x
+        matrix[1, 2] -= min_y
 
         rotated = cv2.warpAffine(
-            crop,
+            base,
             matrix,
             (new_width, new_height),
             flags=cv2.INTER_CUBIC,
@@ -210,23 +228,48 @@ class ManualSplitEntry:
             borderValue=0,
         )
 
-        mask = np.ones((height, width), dtype=np.uint8) * 255
-        rotated_mask = cv2.warpAffine(
-            mask,
-            matrix,
-            (new_width, new_height),
-            flags=cv2.INTER_NEAREST,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=0,
+        crop_points = np.array(
+            [
+                [float(left), float(top), 1.0],
+                [float(right), float(top), 1.0],
+                [float(right), float(bottom), 1.0],
+                [float(left), float(bottom), 1.0],
+            ],
+            dtype=np.float32,
         )
+        rotated_crop = (matrix @ crop_points.T).T
 
-        coords = cv2.findNonZero(rotated_mask)
-        if coords is None:
+        crop_min_x = max(0, int(np.floor(rotated_crop[:, 0].min())))
+        crop_max_x = min(new_width, int(np.ceil(rotated_crop[:, 0].max())))
+        crop_min_y = max(0, int(np.floor(rotated_crop[:, 1].min())))
+        crop_max_y = min(new_height, int(np.ceil(rotated_crop[:, 1].max())))
+
+        if crop_max_x <= crop_min_x or crop_max_y <= crop_min_y:
             return rotated
 
+        cropped = rotated[crop_min_y:crop_max_y, crop_min_x:crop_max_x]
+        if not cropped.size:
+            return rotated
+
+        polygon = rotated_crop[:, :2] - np.array(
+            [float(crop_min_x), float(crop_min_y)], dtype=np.float32
+        )
+        mask_height = crop_max_y - crop_min_y
+        mask_width = crop_max_x - crop_min_x
+        mask = np.zeros((mask_height, mask_width), dtype=np.uint8)
+        if mask_width <= 0 or mask_height <= 0:
+            return cropped
+
+        polygon[:, 0] = np.clip(polygon[:, 0], 0.0, float(mask_width - 1))
+        polygon[:, 1] = np.clip(polygon[:, 1], 0.0, float(mask_height - 1))
+        cv2.fillConvexPoly(mask, polygon.astype(np.int32), 255)
+        coords = cv2.findNonZero(mask)
+        if coords is None:
+            return cropped
+
         x, y, w_box, h_box = cv2.boundingRect(coords)
-        trimmed = rotated[y : y + h_box, x : x + w_box]
-        return trimmed if trimmed.size else rotated
+        trimmed = cropped[y : y + h_box, x : x + w_box]
+        return trimmed if trimmed.size else cropped
 
     def final_split_position(self, final_width: int) -> int:
         if final_width <= 1:
