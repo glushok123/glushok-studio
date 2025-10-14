@@ -1069,6 +1069,18 @@ def parseImage(self, file_path: Path) -> str | None:
 
     analysis_image = image
 
+    def _extract_manual_view(src: np.ndarray) -> np.ndarray:
+        if src is None or not src.size:
+            return src
+
+        left = max(0, min(manual_crop_left, src.shape[1] - 1))
+        right = max(left + 1, min(manual_crop_right, src.shape[1]))
+        top = max(0, min(manual_crop_top, src.shape[0] - 1))
+        bottom = max(top + 1, min(manual_crop_bottom, src.shape[0]))
+
+        view = src[top:bottom, left:right]
+        return view if view.size else src
+
     if getattr(self, "isRemoveBorder", False):
         pad = self.border_px if getattr(self, "isAddBorder", False) else 0
         cropped, bounds = crop_to_content(original_image, pad_x=pad, pad_y=pad)
@@ -1078,10 +1090,7 @@ def parseImage(self, file_path: Path) -> str | None:
             manual_crop_right = int(bounds.right)
             manual_crop_bottom = int(bounds.bottom)
             if manual_mode:
-                analysis_image = original_image[
-                    manual_crop_top:manual_crop_bottom,
-                    manual_crop_left:manual_crop_right,
-                ]
+                analysis_image = _extract_manual_view(original_image)
             else:
                 image = cropped
                 analysis_image = image
@@ -1100,7 +1109,11 @@ def parseImage(self, file_path: Path) -> str | None:
 
     if height >= width:
         save_path = target_dir / relative.name
-        save_source = analysis_image if manual_mode else image
+        if manual_mode:
+            manual_view = _extract_manual_view(original_image)
+            save_source = manual_view if manual_view is not None and manual_view.size else original_image
+        else:
+            save_source = image
         save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
@@ -1110,7 +1123,11 @@ def parseImage(self, file_path: Path) -> str | None:
     except Exception as exc:
         print(f"[WARN] Не удалось разделить {file_path}: {exc}")
         save_path = target_dir / relative.name
-        save_source = analysis_image if manual_mode else image
+        if manual_mode:
+            manual_view = _extract_manual_view(original_image)
+            save_source = manual_view if manual_view is not None and manual_view.size else original_image
+        else:
+            save_source = analysis_image if analysis_image is not None and analysis_image.size else image
         save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
