@@ -455,6 +455,7 @@ class MainApp(QMainWindow):
                         image_width=width_val,
                         image_height=height_val,
                         rotation_deg=float(data.get('rotation_deg', 0.0)),
+                        split_disabled=bool(data.get('split_disabled', False)),
                     )
                 except Exception as exc:
                     message = f"[WARN] Не удалось подготовить запись #{index} для ручной корректировки: {exc}"
@@ -482,10 +483,18 @@ class MainApp(QMainWindow):
             accepted = False
             try:
                 print(f"[INFO] Открытие окна ручной корректировки ({len(entries)} элементов)")
-                dialog = ManualSplitDialog(entries, parent=self)
+                dialog = ManualSplitDialog(
+                    entries,
+                    parent=self,
+                    identical_resolution=is_px_identically,
+                    target_page_width=width_img,
+                    target_page_height=height_img,
+                )
                 self._activeManualDialog = dialog
                 result = dialog.exec_()
                 accepted = result == QDialog.Accepted
+                width_img = dialog.target_page_width or width_img
+                height_img = dialog.target_page_height or height_img
                 if not accepted:
                     for entry in entries:
                         entry.set_split_x(int(entry.auto_split_x))
@@ -494,10 +503,20 @@ class MainApp(QMainWindow):
                 for entry in entries:
                     entry.target_dir.mkdir(parents=True, exist_ok=True)
                     final_image = entry.build_processed_image()
+                    if entry.split_disabled:
+                        destination = entry.target_dir / entry.relative.name
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        save_with_dpi(final_image, destination, dpi_value)
+                        entry.release_image()
+                        continue
+
                     final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
                     split_position = entry.final_split_position(final_width)
-                    result = split_with_fixed_position(final_image, split_position, entry.overlap)
-                    for page_image, page_path in ((result.left, entry.left_path), (result.right, entry.right_path)):
+                    split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
+                    for page_image, page_path in (
+                        (split_result.left, entry.left_path),
+                        (split_result.right, entry.right_path),
+                    ):
                         page_path.parent.mkdir(parents=True, exist_ok=True)
                         if is_px_identically:
                             if width_img and height_img:
