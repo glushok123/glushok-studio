@@ -1043,7 +1043,23 @@ def parseImage(self, file_path: Path) -> str | None:
 
     image = load_image(file_path)
 
-    original_height, original_width = image.shape[:2]
+    original_root = getattr(self, "original_fileurl", self.fileurl)
+    original_candidate = Path(original_root) / relative
+    if original_candidate.exists():
+        original_path = original_candidate
+    else:
+        original_path = file_path
+
+    if original_path == file_path:
+        original_image = image
+    else:
+        try:
+            original_image = load_image(original_path)
+        except ValueError:
+            original_image = image
+            original_path = file_path
+
+    original_height, original_width = original_image.shape[:2]
     manual_crop_left = 0
     manual_crop_top = 0
     manual_crop_right = original_width
@@ -1051,7 +1067,7 @@ def parseImage(self, file_path: Path) -> str | None:
 
     if getattr(self, "isRemoveBorder", False):
         pad = self.border_px if getattr(self, "isAddBorder", False) else 0
-        cropped, bounds = crop_to_content(image, pad_x=pad, pad_y=pad)
+        cropped, bounds = crop_to_content(original_image, pad_x=pad, pad_y=pad)
         if cropped is not None and bounds is not None:
             image = cropped
             manual_crop_left = int(bounds.left)
@@ -1086,7 +1102,7 @@ def parseImage(self, file_path: Path) -> str | None:
             self._manual_split_entries = []
 
         entry_data = {
-            "source_path": str(file_path),
+            "source_path": str(original_path),
             "relative": str(relative),
             "target_dir": str(target_dir),
             "left_path": str(left_path),
