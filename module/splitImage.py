@@ -1059,35 +1059,59 @@ def parseImage(self, file_path: Path) -> str | None:
             original_image = image
             original_path = file_path
 
+    manual_mode = bool(getattr(self, "isManualSplitAdjust", False))
+
     original_height, original_width = original_image.shape[:2]
     manual_crop_left = 0
     manual_crop_top = 0
     manual_crop_right = original_width
     manual_crop_bottom = original_height
 
+    analysis_image = image
+
     if getattr(self, "isRemoveBorder", False):
         pad = self.border_px if getattr(self, "isAddBorder", False) else 0
         cropped, bounds = crop_to_content(original_image, pad_x=pad, pad_y=pad)
         if cropped is not None and bounds is not None:
-            image = cropped
             manual_crop_left = int(bounds.left)
             manual_crop_top = int(bounds.top)
             manual_crop_right = int(bounds.right)
             manual_crop_bottom = int(bounds.bottom)
+            if manual_mode:
+                analysis_image = original_image[
+                    manual_crop_top:manual_crop_bottom,
+                    manual_crop_left:manual_crop_right,
+                ]
+            else:
+                image = cropped
+                analysis_image = image
+        else:
+            analysis_image = original_image if manual_mode else image
+    else:
+        analysis_image = original_image if manual_mode else image
 
-    height, width = image.shape[:2]
+    if analysis_image is None or not analysis_image.size:
+        analysis_image = original_image if manual_mode else image
+
+    if manual_mode:
+        height, width = analysis_image.shape[:2]
+    else:
+        height, width = image.shape[:2]
 
     if height >= width:
         save_path = target_dir / relative.name
-        save_with_dpi(image, save_path, self.dpi)
+        save_source = analysis_image if manual_mode else image
+        save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
     try:
-        spread = split_spread(image, self.width_px, self.pxMediumVal)
+        spread_source = analysis_image if manual_mode else image
+        spread = split_spread(spread_source, self.width_px, self.pxMediumVal)
     except Exception as exc:
         print(f"[WARN] Не удалось разделить {file_path}: {exc}")
         save_path = target_dir / relative.name
-        save_with_dpi(image, save_path, self.dpi)
+        save_source = analysis_image if manual_mode else image
+        save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
     number = relative.stem
