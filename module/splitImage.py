@@ -9,6 +9,7 @@ import numpy as np
 from PyQt5.QtCore import Qt, QPointF, QRectF, pyqtSignal, QObject
 from PyQt5.QtGui import QImage, QPen, QPixmap, QPainter, QColor
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QDialog,
     QGraphicsItem,
     QGraphicsLineItem,
@@ -54,6 +55,7 @@ class ManualSplitEntry:
     crop_right: int = 0
     crop_bottom: int = 0
     rotation_deg: float = 0.0
+    split_disabled: bool = False
     split_x_base: int = field(init=False)
     split_ratio: float = field(init=False)
     _base_image: np.ndarray | None = field(default=None, init=False, repr=False, compare=False)
@@ -77,6 +79,7 @@ class ManualSplitEntry:
         self.crop_right = max(self.crop_left + 1, int(self.crop_right))
         self.crop_bottom = max(self.crop_top + 1, int(self.crop_bottom))
         self.rotation_deg = float(self.rotation_deg)
+        self.split_disabled = bool(self.split_disabled)
         if self.current_width > 0:
             self.split_x = int(np.clip(self.split_x, 0, self.current_width - 1))
             self.split_ratio = float(np.clip(self.split_x / self.current_width, 0.0, 1.0))
@@ -84,7 +87,7 @@ class ManualSplitEntry:
             self.split_x = 0
             self.split_ratio = 0.5
         self.split_x_base = int(self.crop_left + self.split_x)
-
+        
     def preview_qimage(self) -> QImage:
         base = self.ensure_loaded()
         if self._preview_qimage is None:
@@ -133,6 +136,21 @@ class ManualSplitEntry:
             self.split_x_base = int(self.crop_left)
             return
 
+        value = int(np.clip(value, 0, width - 1))
+        self.split_x = value
+        self.split_ratio = float(np.clip(value / width, 0.0, 1.0))
+        self.split_x_base = int(self.crop_left + self.split_x)
+
+    def set_split_base(self, base: int) -> None:
+        width = self.current_width
+        if width <= 1:
+            self.split_x = 0
+            self.split_ratio = 0.5
+            self.split_x_base = int(self.crop_left)
+            return
+
+        base = int(base)
+        value = base - int(self.crop_left)
         value = int(np.clip(value, 0, width - 1))
         self.split_x = value
         self.split_ratio = float(np.clip(value / width, 0.0, 1.0))
@@ -285,10 +303,22 @@ class CropHandle(QGraphicsObject):
 class ManualSplitDialog(QDialog):
     ROTATION_STEP = 0.5
 
-    def __init__(self, entries: List[ManualSplitEntry], parent=None):
+    def __init__(
+        self,
+        entries: List[ManualSplitEntry],
+        parent=None,
+        *,
+        identical_resolution: bool = False,
+        target_page_width: int | None = None,
+        target_page_height: int | None = None,
+    ):
         super().__init__(parent)
         self.entries = entries
         self.current_index = 0
+
+        self._identical_resolution = bool(identical_resolution)
+        self._target_page_width = int(target_page_width or 0)
+        self._target_page_height = int(target_page_height or 0)
 
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._split_line: QGraphicsLineItem | None = None
@@ -316,6 +346,18 @@ class ManualSplitDialog(QDialog):
 
         self.slider = QSlider(Qt.Horizontal)
         self.slider.valueChanged.connect(self.on_slider_changed)
+
+        self.splitToggle = QCheckBox("Разделить изображение")
+        self.splitToggle.setChecked(True)
+        self.splitToggle.toggled.connect(self.on_split_toggled)
+
+        self.alignResolutionButton = QPushButton("Выставить по разрешению")
+        self.alignResolutionButton.setToolTip(
+            "Подогнать рамку под сохранённое разрешение страниц"
+        )
+        self.alignResolutionButton.clicked.connect(self.align_to_resolution)
+        self.alignResolutionButton.setVisible(self._identical_resolution)
+        self.alignResolutionButton.setEnabled(False)
 
         self.resetButton = QPushButton("Сбросить настройки")
         self.prevButton = QPushButton("Предыдущее")
@@ -391,11 +433,16 @@ class ManualSplitDialog(QDialog):
         rotationLayout.addStretch(1)
         rotationLayout.addWidget(self.rotationLabel)
 
+        splitControlLayout = QHBoxLayout()
+        splitControlLayout.addWidget(self.splitToggle)
+        splitControlLayout.addWidget(self.slider, 1)
+        splitControlLayout.addWidget(self.alignResolutionButton)
+
         layout = QVBoxLayout()
         layout.addLayout(headerLayout)
         layout.addWidget(self.view, stretch=1)
         layout.addWidget(self.positionLabel)
-        layout.addWidget(self.slider)
+        layout.addLayout(splitControlLayout)
         layout.addLayout(rotationLayout)
         layout.addWidget(cropGroup)
         layout.addLayout(buttonLayout)
@@ -442,14 +489,14 @@ class ManualSplitDialog(QDialog):
         if self._updating or not self.entries:
             return
         entry = self.entries[self.current_index]
+        if entry.split_disabled:
+            return
         entry.set_split_x(int(value))
-        self.positionLabel.setText(
-            f"Позиция разреза: {entry.split_x}px из {entry.current_width}px"
-        )
         if self._split_line is not None:
             self._split_line.setLine(
                 entry.split_x_base, entry.crop_top, entry.split_x_base, entry.crop_bottom
             )
+        self._update_split_status(entry)
 
     def goto_previous(self):
         if self.current_index <= 0:
@@ -472,6 +519,7 @@ class ManualSplitDialog(QDialog):
         entry.crop_right = entry.width
         entry.crop_bottom = entry.height
         entry.rotation_deg = 0.0
+        entry.split_disabled = False
         auto_split = int(np.clip(entry.auto_split_x, 0, entry.width - 1)) if entry.width > 1 else 0
         entry.set_split_x(auto_split)
         self._sync_controls(entry)
@@ -523,14 +571,15 @@ class ManualSplitDialog(QDialog):
         self._update_scene_rect()
 
         self.view.resetTransform()
-        rect = self.scene.sceneRect()
-        if rect.width() > 0 and rect.height() > 0:
-            self.view.fitInView(rect, Qt.KeepAspectRatio)
+        if self._pixmap_item is not None:
+            self.view.fitInView(self._pixmap_item, Qt.KeepAspectRatio)
+        else:
+            rect = self.scene.sceneRect()
+            if rect.width() > 0 and rect.height() > 0:
+                self.view.fitInView(rect, Qt.KeepAspectRatio)
 
-        self.positionLabel.setText(
-            f"Позиция разреза: {entry.split_x}px из {entry.current_width}px"
-        )
         self.rotationLabel.setText(f"Поворот: {entry.rotation_deg:.2f}°")
+        self._update_split_status(entry)
 
     def _load_entry(self, entry: ManualSplitEntry) -> None:
         if self._pixmap_item is None:
@@ -584,12 +633,16 @@ class ManualSplitDialog(QDialog):
         self._crop_rect_item.setPen(rect_pen)
         self._crop_rect_item.setRect(rect)
 
-        split_pen = self._split_line.pen()
-        split_pen.setWidth(max(2, entry.current_width // 200 + 1))
-        self._split_line.setPen(split_pen)
-        self._split_line.setLine(
-            entry.split_x_base, entry.crop_top, entry.split_x_base, entry.crop_bottom
-        )
+        if entry.split_disabled:
+            self._split_line.setVisible(False)
+        else:
+            split_pen = self._split_line.pen()
+            split_pen.setWidth(max(2, entry.current_width // 200 + 1))
+            self._split_line.setPen(split_pen)
+            self._split_line.setLine(
+                entry.split_x_base, entry.crop_top, entry.split_x_base, entry.crop_bottom
+            )
+            self._split_line.setVisible(True)
 
         self._update_handles(entry, rect)
 
@@ -725,10 +778,107 @@ class ManualSplitDialog(QDialog):
 
         self._updating = False
 
-        self.positionLabel.setText(
+        self.rotationLabel.setText(f"Поворот: {entry.rotation_deg:.2f}°")
+        self._update_split_status(entry)
+
+    def on_split_toggled(self, checked: bool) -> None:
+        if self._updating or not self.entries:
+            return
+        entry = self.entries[self.current_index]
+        entry.split_disabled = not bool(checked)
+        self._update_split_status(entry)
+        self.refresh_scene()
+
+    def align_to_resolution(self) -> None:
+        if not self.entries or not self._identical_resolution:
+            return
+        entry = self.entries[self.current_index]
+        if entry.split_disabled:
+            return
+
+        target_width = int(self._target_page_width)
+        target_height = int(self._target_page_height)
+        if target_width <= 0 or target_height <= 0:
+            final_image = entry.build_processed_image()
+            final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
+            split_position = entry.final_split_position(final_width)
+            split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
+            if split_result.left.size:
+                self.set_target_resolution(
+                    split_result.left.shape[1],
+                    split_result.left.shape[0],
+                )
+            return
+
+        overlap = max(0, int(entry.overlap))
+        half_width = max(1, target_width - overlap)
+        base = entry.split_x_base
+        new_width = max(2, half_width * 2)
+
+        if entry.width < new_width:
+            crop_left = 0
+            crop_right = entry.width
+        else:
+            crop_left = base - half_width
+            crop_right = crop_left + new_width
+            if crop_left < 0:
+                crop_left = 0
+                crop_right = new_width
+            if crop_right > entry.width:
+                crop_right = entry.width
+                crop_left = entry.width - new_width
+
+        crop_left = int(round(crop_left))
+        crop_right = int(round(crop_right))
+        crop_left = max(0, min(crop_left, entry.width - 1))
+        crop_right = max(crop_left + 1, min(crop_right, entry.width))
+
+        desired_height = min(target_height, entry.height)
+        current_height = entry.current_height
+        centre_y = entry.crop_top + current_height / 2.0 if current_height else entry.crop_top
+        half_height = desired_height / 2.0
+        crop_top = int(round(centre_y - half_height))
+        crop_bottom = crop_top + desired_height
+        if crop_top < 0:
+            crop_top = 0
+            crop_bottom = desired_height
+        if crop_bottom > entry.height:
+            crop_bottom = entry.height
+            crop_top = entry.height - desired_height
+        crop_top = max(0, min(int(round(crop_top)), entry.height - 1))
+        crop_bottom = max(crop_top + 1, min(int(round(crop_bottom)), entry.height))
+
+        entry.crop_left = crop_left
+        entry.crop_right = crop_right
+        entry.crop_top = crop_top
+        entry.crop_bottom = crop_bottom
+        entry.set_split_base(base)
+
+        self._sync_controls(entry)
+        self.refresh_scene()
+
+    def _update_split_status(self, entry: ManualSplitEntry) -> None:
+        slider_has_range = self.slider.maximum() > 0
+        slider_enabled = slider_has_range and not entry.split_disabled
+        self.slider.setEnabled(slider_enabled)
+
+        text = "Разделение отключено" if entry.split_disabled else (
             f"Позиция разреза: {entry.split_x}px из {entry.current_width}px"
         )
-        self.rotationLabel.setText(f"Поворот: {entry.rotation_deg:.2f}°")
+        self.positionLabel.setText(text)
+
+        self.splitToggle.blockSignals(True)
+        self.splitToggle.setChecked(not entry.split_disabled)
+        self.splitToggle.blockSignals(False)
+
+        can_align = (
+            self._identical_resolution
+            and not entry.split_disabled
+            and self._target_page_width > 0
+            and self._target_page_height > 0
+        )
+        self.alignResolutionButton.setEnabled(can_align)
+        self.alignResolutionButton.setVisible(self._identical_resolution)
 
     def _update_grid(self, entry: ManualSplitEntry) -> None:
         for line in self._grid_lines:
@@ -763,12 +913,29 @@ class ManualSplitDialog(QDialog):
             self._grid_lines.append(line)
 
     def _update_scene_rect(self) -> None:
-        rect = self.scene.itemsBoundingRect()
+        if self._pixmap_item is not None:
+            rect = self._pixmap_item.sceneBoundingRect()
+        else:
+            rect = self.scene.itemsBoundingRect()
         if rect.isNull():
             return
         padding = 40.0
         rect = rect.adjusted(-padding, -padding, padding, padding)
         self.scene.setSceneRect(rect)
+
+    @property
+    def target_page_width(self) -> int:
+        return max(0, int(self._target_page_width))
+
+    @property
+    def target_page_height(self) -> int:
+        return max(0, int(self._target_page_height))
+
+    def set_target_resolution(self, width: int | None, height: int | None) -> None:
+        self._target_page_width = int(width or 0)
+        self._target_page_height = int(height or 0)
+        if self.entries:
+            self._update_split_status(self.entries[self.current_index])
 
     def closeEvent(self, event):
         if self.fullscreenButton.isChecked():
@@ -876,25 +1043,75 @@ def parseImage(self, file_path: Path) -> str | None:
 
     image = load_image(file_path)
 
+    original_root = getattr(self, "original_fileurl", self.fileurl)
+    original_candidate = Path(original_root) / relative
+    if original_candidate.exists():
+        original_path = original_candidate
+    else:
+        original_path = file_path
+
+    if original_path == file_path:
+        original_image = image
+    else:
+        try:
+            original_image = load_image(original_path)
+        except ValueError:
+            original_image = image
+            original_path = file_path
+
+    manual_mode = bool(getattr(self, "isManualSplitAdjust", False))
+
+    original_height, original_width = original_image.shape[:2]
+    manual_crop_left = 0
+    manual_crop_top = 0
+    manual_crop_right = original_width
+    manual_crop_bottom = original_height
+
+    analysis_image = image
+
     if getattr(self, "isRemoveBorder", False):
         pad = self.border_px if getattr(self, "isAddBorder", False) else 0
-        cropped, _ = crop_to_content(image, pad_x=pad, pad_y=pad)
-        if cropped is not None:
-            image = cropped
+        cropped, bounds = crop_to_content(original_image, pad_x=pad, pad_y=pad)
+        if cropped is not None and bounds is not None:
+            manual_crop_left = int(bounds.left)
+            manual_crop_top = int(bounds.top)
+            manual_crop_right = int(bounds.right)
+            manual_crop_bottom = int(bounds.bottom)
+            if manual_mode:
+                analysis_image = original_image[
+                    manual_crop_top:manual_crop_bottom,
+                    manual_crop_left:manual_crop_right,
+                ]
+            else:
+                image = cropped
+                analysis_image = image
+        else:
+            analysis_image = original_image if manual_mode else image
+    else:
+        analysis_image = original_image if manual_mode else image
 
-    height, width = image.shape[:2]
+    if analysis_image is None or not analysis_image.size:
+        analysis_image = original_image if manual_mode else image
+
+    if manual_mode:
+        height, width = analysis_image.shape[:2]
+    else:
+        height, width = image.shape[:2]
 
     if height >= width:
         save_path = target_dir / relative.name
-        save_with_dpi(image, save_path, self.dpi)
+        save_source = analysis_image if manual_mode else image
+        save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
     try:
-        spread = split_spread(image, self.width_px, self.pxMediumVal)
+        spread_source = analysis_image if manual_mode else image
+        spread = split_spread(spread_source, self.width_px, self.pxMediumVal)
     except Exception as exc:
         print(f"[WARN] Не удалось разделить {file_path}: {exc}")
         save_path = target_dir / relative.name
-        save_with_dpi(image, save_path, self.dpi)
+        save_source = analysis_image if manual_mode else image
+        save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
     number = relative.stem
@@ -909,7 +1126,7 @@ def parseImage(self, file_path: Path) -> str | None:
             self._manual_split_entries = []
 
         entry_data = {
-            "source_path": str(file_path),
+            "source_path": str(original_path),
             "relative": str(relative),
             "target_dir": str(target_dir),
             "left_path": str(left_path),
@@ -917,13 +1134,14 @@ def parseImage(self, file_path: Path) -> str | None:
             "auto_split_x": int(spread.split_x),
             "split_x": int(spread.split_x),
             "overlap": int(self.width_px),
-            "crop_left": 0,
-            "crop_top": 0,
-            "crop_right": int(image.shape[1]),
-            "crop_bottom": int(image.shape[0]),
+            "crop_left": manual_crop_left,
+            "crop_top": manual_crop_top,
+            "crop_right": manual_crop_right,
+            "crop_bottom": manual_crop_bottom,
             "rotation_deg": 0.0,
-            "image_width": int(image.shape[1]),
-            "image_height": int(image.shape[0]),
+            "image_width": original_width,
+            "image_height": original_height,
+            "split_disabled": False,
         }
         self._manual_split_entries.append(entry_data)
         return str(file_path)
