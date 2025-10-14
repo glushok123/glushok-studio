@@ -5,7 +5,10 @@ a = Analysis(
     ['GlushokStudio.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ('gui/index.ui', 'gui'),
+        ('load.gif', '.'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

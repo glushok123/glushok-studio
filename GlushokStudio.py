@@ -22,6 +22,13 @@ except Exception:
 #pyinstaller --onefile  .\GlushokStudio.py
 
 
+def resource_path(*relative_parts: str) -> str:
+    """Resolve resource paths for both source and PyInstaller bundles."""
+
+    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, *relative_parts)
+
+
 def ensure_ui_is_wellformed(src_path: str) -> str:
     """Return a temporary path to a well-formed copy of the Qt Designer UI file."""
     with open(src_path, encoding='utf-8') as f:
@@ -112,8 +119,7 @@ install_global_exception_hook()
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        ui_path = os.path.join(base_dir, 'gui', 'index.ui')
+        ui_path = resource_path('gui', 'index.ui')
         load_ui_with_repair(ui_path, self)
 
         # Очередь папок: каждый элемент — словарь {'path': str, 'status': str, 'progress': int}
@@ -336,7 +342,7 @@ class MainApp(QMainWindow):
 
         # Стандартная анимация и установка параметров
         self.statusLoaded(0)
-        self.gif = QMovie('load.gif')
+        self.gif = QMovie(resource_path('load.gif'))
         self.label_8.setMovie(self.gif)
         self.gif.start()
         self.setParamsUi()
