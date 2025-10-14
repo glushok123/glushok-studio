@@ -1043,11 +1043,21 @@ def parseImage(self, file_path: Path) -> str | None:
 
     image = load_image(file_path)
 
+    original_height, original_width = image.shape[:2]
+    manual_crop_left = 0
+    manual_crop_top = 0
+    manual_crop_right = original_width
+    manual_crop_bottom = original_height
+
     if getattr(self, "isRemoveBorder", False):
         pad = self.border_px if getattr(self, "isAddBorder", False) else 0
-        cropped, _ = crop_to_content(image, pad_x=pad, pad_y=pad)
-        if cropped is not None:
+        cropped, bounds = crop_to_content(image, pad_x=pad, pad_y=pad)
+        if cropped is not None and bounds is not None:
             image = cropped
+            manual_crop_left = int(bounds.left)
+            manual_crop_top = int(bounds.top)
+            manual_crop_right = int(bounds.right)
+            manual_crop_bottom = int(bounds.bottom)
 
     height, width = image.shape[:2]
 
@@ -1084,13 +1094,13 @@ def parseImage(self, file_path: Path) -> str | None:
             "auto_split_x": int(spread.split_x),
             "split_x": int(spread.split_x),
             "overlap": int(self.width_px),
-            "crop_left": 0,
-            "crop_top": 0,
-            "crop_right": int(image.shape[1]),
-            "crop_bottom": int(image.shape[0]),
+            "crop_left": manual_crop_left,
+            "crop_top": manual_crop_top,
+            "crop_right": manual_crop_right,
+            "crop_bottom": manual_crop_bottom,
             "rotation_deg": 0.0,
-            "image_width": int(image.shape[1]),
-            "image_height": int(image.shape[0]),
+            "image_width": original_width,
+            "image_height": original_height,
             "split_disabled": False,
         }
         self._manual_split_entries.append(entry_data)
