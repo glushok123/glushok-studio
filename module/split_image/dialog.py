@@ -5,11 +5,12 @@ from typing import List
 
 import numpy as np
 from PyQt5.QtCore import QObject, QPointF, QRectF, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap
+from PyQt5.QtGui import QBrush, QColor, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
     QGraphicsItem,
+    QGraphicsItemGroup,
     QGraphicsLineItem,
     QGraphicsObject,
     QGraphicsPixmapItem,
@@ -132,6 +133,11 @@ class ManualSplitDialog(QDialog):
         self.view.setAlignment(Qt.AlignCenter)
         self.view.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+
+        self._content_group = QGraphicsItemGroup()
+        self._content_group.setHandlesChildEvents(False)
+        self._content_group.setFlag(QGraphicsItem.ItemHasNoContents, True)
+        self.scene.addItem(self._content_group)
 
         self._zoom = 1.0
         self._manual_zoom = False
@@ -290,14 +296,27 @@ class ManualSplitDialog(QDialog):
 
         layout = QVBoxLayout()
         layout.addLayout(headerLayout)
-        layout.addWidget(self.view, stretch=1)
-        zoomLayout = QHBoxLayout()
-        zoomLayout.addWidget(self.zoomOutButton)
-        zoomLayout.addWidget(self.zoomSlider, 1)
-        zoomLayout.addWidget(self.zoomInButton)
-        zoomLayout.addWidget(self.zoomFitButton)
-        zoomLayout.addWidget(self.zoomLabel)
-        layout.addLayout(zoomLayout)
+
+        zoomControlsLayout = QVBoxLayout()
+        zoomButtonsLayout = QHBoxLayout()
+        zoomButtonsLayout.addWidget(self.zoomOutButton)
+        zoomButtonsLayout.addWidget(self.zoomInButton)
+        zoomButtonsLayout.addWidget(self.zoomFitButton)
+        zoomControlsLayout.addLayout(zoomButtonsLayout)
+        zoomControlsLayout.addWidget(self.zoomSlider)
+        zoomControlsLayout.addWidget(self.zoomLabel)
+
+        sideControlsLayout = QVBoxLayout()
+        sideControlsLayout.addLayout(zoomControlsLayout)
+        sideControlsLayout.addWidget(cropGroup)
+        sideControlsLayout.addStretch(1)
+
+        contentLayout = QHBoxLayout()
+        contentLayout.addLayout(sideControlsLayout)
+        contentLayout.addWidget(self.view, stretch=1)
+        contentLayout.setAlignment(sideControlsLayout, Qt.AlignTop)
+
+        layout.addLayout(contentLayout)
         layout.addWidget(self.positionLabel)
         layout.addWidget(self.heightInfoLabel)
         layout.addWidget(self.widthInfoLabel)
@@ -309,7 +328,6 @@ class ManualSplitDialog(QDialog):
         layout.addWidget(self.resolutionWarningLabel)
         layout.addLayout(splitControlLayout)
         layout.addLayout(rotationLayout)
-        layout.addWidget(cropGroup)
         layout.addLayout(buttonLayout)
 
         self.setLayout(layout)
@@ -427,19 +445,36 @@ class ManualSplitDialog(QDialog):
 
         if self._pixmap_item is None:
             self._pixmap_item = QGraphicsPixmapItem(pixmap)
+            self._pixmap_item.setTransformationMode(Qt.SmoothTransformation)
             self.scene.addItem(self._pixmap_item)
+            self._pixmap_item.setParentItem(self._content_group)
+            self._pixmap_item.setZValue(0)
         else:
             self._pixmap_item.setPixmap(pixmap)
 
         if self._split_line is None:
-            self._split_line = self.scene.addLine(0, 0, 0, 0, QPen(Qt.red, 2))
+            pen = QPen(Qt.red)
+            pen.setWidth(4)
+            pen.setCosmetic(True)
+            self._split_line = QGraphicsLineItem(0, 0, 0, 0)
+            self.scene.addItem(self._split_line)
+            self._split_line.setParentItem(self._content_group)
+            self._split_line.setPen(pen)
+            self._split_line.setZValue(5)
         if self._crop_rect_item is None:
             pen = QPen(QColor(255, 215, 0))
-            pen.setWidth(2)
-            self._crop_rect_item = self.scene.addRect(QRectF(), pen)
+            pen.setWidth(4)
+            pen.setCosmetic(True)
+            self._crop_rect_item = QGraphicsRectItem()
+            self.scene.addItem(self._crop_rect_item)
+            self._crop_rect_item.setParentItem(self._content_group)
+            self._crop_rect_item.setPen(pen)
+            self._crop_rect_item.setBrush(QBrush(Qt.NoBrush))
+            self._crop_rect_item.setZValue(4)
 
         self._update_scene_items(entry)
         self._update_grid(entry)
+        self._apply_rotation(entry)
         self._update_scene_rect()
 
         if self._fit_pending and not self._manual_zoom:
@@ -508,6 +543,7 @@ class ManualSplitDialog(QDialog):
             for side in ("left", "right", "top", "bottom"):
                 handle = CropHandle(side)
                 handle.moved.connect(lambda value, s=side: self._handle_moved(s, value))
+                handle.setParentItem(self._content_group)
                 self.scene.addItem(handle)
                 self._handles[side] = handle
 
@@ -757,11 +793,15 @@ class ManualSplitDialog(QDialog):
         for i in range(1, 3):
             x = left + width * i / 3.0
             line = self.scene.addLine(x, top, x, bottom, pen)
+            line.setParentItem(self._content_group)
+            line.setZValue(3)
             self._grid_lines.append(line)
 
         for i in range(1, 3):
             y = top + height * i / 3.0
             line = self.scene.addLine(left, y, right, y, pen)
+            line.setParentItem(self._content_group)
+            line.setZValue(3)
             self._grid_lines.append(line)
 
     def _update_scene_rect(self) -> None:
@@ -1002,6 +1042,7 @@ class ManualSplitDialog(QDialog):
         entry = self.entries[self.current_index]
         entry.rotation_deg = float(entry.rotation_deg + delta)
         entry.release_image()
+        self._sync_controls(entry)
         self.refresh_scene()
 
     def reset_rotation(self) -> None:
@@ -1010,6 +1051,7 @@ class ManualSplitDialog(QDialog):
         entry = self.entries[self.current_index]
         entry.rotation_deg = 0.0
         entry.release_image()
+        self._sync_controls(entry)
         self.refresh_scene()
 
     def on_crop_changed(self) -> None:
@@ -1029,7 +1071,27 @@ class ManualSplitDialog(QDialog):
             self.fullscreenButton.setChecked(False)
             event.accept()
             return
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter) and event.modifiers() == Qt.NoModifier:
+            previous_index = self.current_index
+            self.goto_next()
+            event.accept()
+            if previous_index == self.current_index:
+                return
+            return
         super().keyPressEvent(event)
+
+    def _apply_rotation(self, entry: ManualSplitEntry) -> None:
+        if self._pixmap_item is None:
+            return
+
+        centre_x, centre_y = entry.crop_centre
+        self._pixmap_item.setTransformOriginPoint(float(centre_x), float(centre_y))
+        self._pixmap_item.setRotation(float(entry.rotation_deg))
+
+        if self._content_group is not None and self._content_group.rotation() != 0.0:
+            # Keep overlay geometry unrotated so the operator sees the original
+            # detection bounds even while the image preview is rotated.
+            self._content_group.setRotation(0.0)
 
     def _entry_dimensions_text(self, entry: ManualSplitEntry) -> str:
         dims = _entry_page_dimensions(entry)
