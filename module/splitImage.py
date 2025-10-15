@@ -1729,6 +1729,13 @@ def parseImage(self, file_path: Path) -> str | None:
             save_source = manual_view if manual_view is not None and manual_view.size else original_image
         else:
             save_source = image
+
+        if self.isPxIdentically and save_source is not None and getattr(save_source, "size", 0):
+            if self.width_img and self.height_img:
+                save_source = _fit_page_to_canvas(save_source, self.width_img, self.height_img)
+            else:
+                self.width_img, self.height_img = save_source.shape[1], save_source.shape[0]
+                save_source = _fit_page_to_canvas(save_source, self.width_img, self.height_img)
         save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
