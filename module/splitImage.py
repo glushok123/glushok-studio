@@ -1729,6 +1729,16 @@ def parseImage(self, file_path: Path) -> str | None:
             save_source = manual_view if manual_view is not None and manual_view.size else original_image
         else:
             save_source = image
+
+        if self.isPxIdentically and save_source is not None and getattr(save_source, "size", 0):
+            target_width = int(self.width_img or 0)
+            target_height = int(self.height_img or 0)
+            if target_width <= 0 or target_height <= 0:
+                target_width = int(save_source.shape[1])
+                target_height = int(save_source.shape[0])
+                self.width_img = target_width
+                self.height_img = target_height
+            save_source = _fit_page_to_canvas(save_source, target_width, target_height)
         save_with_dpi(save_source, save_path, self.dpi)
         return str(save_path)
 
@@ -1779,11 +1789,15 @@ def parseImage(self, file_path: Path) -> str | None:
         return str(file_path)
 
     for page_image, page_path in ((spread.left, left_path), (spread.right, right_path)):
-        if self.isPxIdentically:
-            if self.width_img and self.height_img:
-                page_image = _fit_page_to_canvas(page_image, self.width_img, self.height_img)
-            else:
-                self.width_img, self.height_img = page_image.shape[1], page_image.shape[0]
+        if self.isPxIdentically and page_image is not None and getattr(page_image, "size", 0):
+            target_width = int(self.width_img or 0)
+            target_height = int(self.height_img or 0)
+            if target_width <= 0 or target_height <= 0:
+                target_width = int(page_image.shape[1])
+                target_height = int(page_image.shape[0])
+                self.width_img = target_width
+                self.height_img = target_height
+            page_image = _fit_page_to_canvas(page_image, target_width, target_height)
 
         save_with_dpi(page_image, page_path, self.dpi)
 
