@@ -495,7 +495,7 @@ class MainApp(QMainWindow):
                     and getattr(thread_flags, "isSplit", False)
                     and getattr(thread_flags, "isManualSplitAdjust", False)
                     and getattr(thread_flags, "isRemoveBorder", False)
-                    and getattr(thread_flags, "isAddBlackBorder", False)
+                    and getattr(thread_flags, "isAddBorder", False)
                 )
                 dialog = ManualSplitDialog(
                     entries,
