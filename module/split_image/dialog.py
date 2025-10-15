@@ -548,6 +548,7 @@ class ManualSplitDialog(QDialog):
             for side in ("left", "right", "top", "bottom"):
                 handle = CropHandle(side)
                 handle.moved.connect(lambda value, s=side: self._handle_moved(s, value))
+                handle.setParentItem(self._content_group)
                 self.scene.addItem(handle)
                 self._handles[side] = handle
 
