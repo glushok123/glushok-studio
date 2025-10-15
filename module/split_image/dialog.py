@@ -1079,11 +1079,17 @@ class ManualSplitDialog(QDialog):
         super().keyPressEvent(event)
 
     def _apply_rotation(self, entry: ManualSplitEntry) -> None:
-        if self._content_group is None:
+        if self._pixmap_item is None:
             return
+
         centre_x, centre_y = entry.crop_centre
-        self._content_group.setTransformOriginPoint(float(centre_x), float(centre_y))
-        self._content_group.setRotation(float(entry.rotation_deg))
+        self._pixmap_item.setTransformOriginPoint(float(centre_x), float(centre_y))
+        self._pixmap_item.setRotation(float(entry.rotation_deg))
+
+        if self._content_group is not None and self._content_group.rotation() != 0.0:
+            # Keep overlay geometry unrotated so the operator sees the original
+            # detection bounds even while the image preview is rotated.
+            self._content_group.setRotation(0.0)
 
     def _entry_dimensions_text(self, entry: ManualSplitEntry) -> str:
         dims = _entry_page_dimensions(entry)
