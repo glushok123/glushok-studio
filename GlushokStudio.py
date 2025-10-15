@@ -489,12 +489,21 @@ class MainApp(QMainWindow):
             accepted = False
             try:
                 print(f"[INFO] Открытие окна ручной корректировки ({len(entries)} элементов)")
+                thread_flags = worker_thread if worker_thread is not None else self
+                strict_identical = bool(
+                    is_px_identically
+                    and getattr(thread_flags, "isSplit", False)
+                    and getattr(thread_flags, "isManualSplitAdjust", False)
+                    and getattr(thread_flags, "isRemoveBorder", False)
+                    and getattr(thread_flags, "isAddBlackBorder", False)
+                )
                 dialog = ManualSplitDialog(
                     entries,
                     parent=self,
                     identical_resolution=is_px_identically,
                     target_page_width=width_img,
                     target_page_height=height_img,
+                    enforce_identical_resolution=strict_identical,
                 )
                 self._activeManualDialog = dialog
                 result = dialog.exec_()
@@ -525,11 +534,17 @@ class MainApp(QMainWindow):
                     ):
                         page_path.parent.mkdir(parents=True, exist_ok=True)
                         if is_px_identically:
-                            if width_img and height_img:
+                            actual_width = page_image.shape[1] if page_image.ndim >= 2 else 0
+                            actual_height = page_image.shape[0] if page_image.ndim >= 2 else 0
+                            if strict_identical:
+                                if actual_width and actual_height:
+                                    width_img = actual_width
+                                    height_img = actual_height
+                            elif width_img and height_img:
                                 page_image = _fit_page_to_canvas(page_image, width_img, height_img)
                             else:
-                                width_img = page_image.shape[1] if page_image.ndim >= 2 else 0
-                                height_img = page_image.shape[0] if page_image.ndim >= 2 else 0
+                                width_img = actual_width
+                                height_img = actual_height
                         save_with_dpi(page_image, page_path, dpi_value)
                     entry.release_image()
 
