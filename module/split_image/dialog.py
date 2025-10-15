@@ -135,6 +135,8 @@ class ManualSplitDialog(QDialog):
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
 
         self._content_group = QGraphicsItemGroup()
+        self._content_group.setHandlesChildEvents(False)
+        self._content_group.setFlag(QGraphicsItem.ItemHasNoContents, True)
         self.scene.addItem(self._content_group)
 
         self._zoom = 1.0
