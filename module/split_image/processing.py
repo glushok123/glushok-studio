@@ -116,7 +116,12 @@ def trim_page_to_resolution(
     anchor_horizontal: str = "center",
     anchor_vertical: str = "center",
 ) -> np.ndarray:
-    """Trim *image* so that it exactly matches the requested resolution."""
+    """Trim *image* so that it matches the requested resolution.
+
+    The function crops the page when it exceeds the target dimensions and pads it
+    with transparent/black pixels when it falls short. This guarantees that all
+    resulting images share the same size when a resolution is provided.
+    """
 
     if image is None or image.ndim < 2:
         return image
@@ -186,12 +191,49 @@ def trim_page_to_resolution(
     right = max(left + 1, min(right, width))
     bottom = max(top + 1, min(bottom, height))
 
-    if (right - left == width and target_width <= 0) and (
-        bottom - top == height and target_height <= 0
-    ):
-        return image
+    cropped = image[top:bottom, left:right]
+    if cropped is None or cropped.ndim < 2:
+        return cropped
 
-    return image[top:bottom, left:right]
+    cropped_height, cropped_width = cropped.shape[:2]
+    desired_width = int(target_width) if target_width > 0 else cropped_width
+    desired_height = int(target_height) if target_height > 0 else cropped_height
+
+    desired_width = max(desired_width, cropped_width)
+    desired_height = max(desired_height, cropped_height)
+
+    if desired_width == cropped_width and desired_height == cropped_height:
+        return cropped
+
+    def _offset(total: int, size: int, anchor: str) -> int:
+        if total <= size:
+            return 0
+        anchor = (anchor or "center").lower()
+        if anchor in {"right", "bottom"}:
+            return total - size
+        if anchor in {"left", "top"}:
+            return 0
+        return max(0, (total - size) // 2)
+
+    channels = 1 if cropped.ndim == 2 else cropped.shape[2]
+    if cropped.ndim == 2:
+        canvas = np.zeros((desired_height, desired_width), dtype=cropped.dtype)
+    else:
+        canvas = np.zeros((desired_height, desired_width, channels), dtype=cropped.dtype)
+
+    x_offset = _offset(desired_width, cropped_width, anchor_horizontal)
+    y_offset = _offset(desired_height, cropped_height, anchor_vertical)
+
+    if cropped.ndim == 2:
+        canvas[y_offset : y_offset + cropped_height, x_offset : x_offset + cropped_width] = cropped
+    else:
+        canvas[
+            y_offset : y_offset + cropped_height,
+            x_offset : x_offset + cropped_width,
+            :,
+        ] = cropped
+
+    return canvas
 
 
 def parseImage(worker, file_path: Path) -> str | None:

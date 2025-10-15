@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List
 
 import numpy as np
-from PyQt5.QtCore import QObject, QPointF, QRectF, Qt, pyqtSignal
+from PyQt5.QtCore import QObject, QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -130,6 +130,15 @@ class ManualSplitDialog(QDialog):
         self.view.setRenderHint(QPainter.SmoothPixmapTransform, True)
         self.view.setDragMode(QGraphicsView.ScrollHandDrag)
         self.view.setAlignment(Qt.AlignCenter)
+        self.view.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+
+        self._zoom = 1.0
+        self._manual_zoom = False
+        self._fit_pending = True
+        self._ZOOM_MIN = 1
+        self._ZOOM_MAX = 1000
+        self._ZOOM_STEP = 10
 
         self.fileLabel = QLabel()
         self.positionLabel = QLabel()
@@ -196,6 +205,21 @@ class ManualSplitDialog(QDialog):
         self.gotoIndexSpin.setKeyboardTracking(False)
         self.gotoIndexSpin.setFixedWidth(80)
         self.gotoIndexButton = QPushButton("Перейти")
+
+        self.zoomLabel = QLabel("Масштаб: 100%")
+        self.zoomSlider = QSlider(Qt.Horizontal)
+        self.zoomSlider.setRange(self._ZOOM_MIN, self._ZOOM_MAX)
+        self.zoomSlider.setValue(100)
+        self.zoomSlider.valueChanged.connect(self.on_zoom_slider_changed)
+        self.zoomOutButton = QPushButton("−")
+        self.zoomOutButton.setToolTip("Уменьшить масштаб")
+        self.zoomOutButton.clicked.connect(lambda: self.step_zoom(-self._ZOOM_STEP))
+        self.zoomInButton = QPushButton("+")
+        self.zoomInButton.setToolTip("Увеличить масштаб")
+        self.zoomInButton.clicked.connect(lambda: self.step_zoom(self._ZOOM_STEP))
+        self.zoomFitButton = QPushButton("По размеру")
+        self.zoomFitButton.setToolTip("Подогнать изображение под размер окна")
+        self.zoomFitButton.clicked.connect(self.reset_zoom_to_fit)
 
         self.resetButton.clicked.connect(self.reset_current)
         self.gotoFirstButton.clicked.connect(self.goto_first)
@@ -267,6 +291,13 @@ class ManualSplitDialog(QDialog):
         layout = QVBoxLayout()
         layout.addLayout(headerLayout)
         layout.addWidget(self.view, stretch=1)
+        zoomLayout = QHBoxLayout()
+        zoomLayout.addWidget(self.zoomOutButton)
+        zoomLayout.addWidget(self.zoomSlider, 1)
+        zoomLayout.addWidget(self.zoomInButton)
+        zoomLayout.addWidget(self.zoomFitButton)
+        zoomLayout.addWidget(self.zoomLabel)
+        layout.addLayout(zoomLayout)
         layout.addWidget(self.positionLabel)
         layout.addWidget(self.heightInfoLabel)
         layout.addWidget(self.widthInfoLabel)
@@ -318,6 +349,8 @@ class ManualSplitDialog(QDialog):
         self.update_navigation()
         self._sync_controls(entry)
         self._update_resolution_metrics()
+        self._manual_zoom = False
+        self._fit_pending = True
         self.refresh_scene()
 
     def update_navigation(self):
@@ -337,6 +370,37 @@ class ManualSplitDialog(QDialog):
             self.gotoIndexSpin.setRange(1, total)
             self.gotoIndexSpin.setValue(self.current_index + 1)
             self.gotoIndexSpin.blockSignals(False)
+
+        for widget in (
+            self.zoomSlider,
+            self.zoomInButton,
+            self.zoomOutButton,
+            self.zoomFitButton,
+        ):
+            widget.setEnabled(has_entries)
+
+    def on_zoom_slider_changed(self, value: int) -> None:
+        if not self.entries or self._pixmap_item is None:
+            return
+        clamped = int(np.clip(value, self._ZOOM_MIN, self._ZOOM_MAX))
+        scale = clamped / 100.0
+        self._manual_zoom = True
+        self._fit_pending = False
+        self._apply_zoom(scale, update_slider=False)
+
+    def step_zoom(self, delta: int) -> None:
+        value = self.zoomSlider.value() + int(delta)
+        clamped = int(np.clip(value, self._ZOOM_MIN, self._ZOOM_MAX))
+        if clamped != self.zoomSlider.value():
+            self.zoomSlider.setValue(clamped)
+        else:
+            # Even if the slider value didn't change (already at limit), update label.
+            self.zoomLabel.setText(f"Масштаб: {int(round(clamped))}%")
+
+    def reset_zoom_to_fit(self) -> None:
+        self._manual_zoom = False
+        self._fit_pending = True
+        self._fit_view_to_pixmap(force=True)
 
     def on_slider_changed(self, value: int):
         if self._updating or not self.entries:
@@ -377,6 +441,48 @@ class ManualSplitDialog(QDialog):
         self._update_scene_items(entry)
         self._update_grid(entry)
         self._update_scene_rect()
+
+        if self._fit_pending and not self._manual_zoom:
+            self._fit_view_to_pixmap()
+
+    def _apply_zoom(self, scale: float, *, update_slider: bool = True) -> None:
+        scale = float(np.clip(scale, self._ZOOM_MIN / 100.0, self._ZOOM_MAX / 100.0))
+        self.view.resetTransform()
+        self.view.scale(scale, scale)
+        self._zoom = scale
+        percent = int(round(scale * 100))
+        if update_slider:
+            self.zoomSlider.blockSignals(True)
+            self.zoomSlider.setValue(percent)
+            self.zoomSlider.blockSignals(False)
+        self.zoomLabel.setText(f"Масштаб: {percent}%")
+
+    def _fit_view_to_pixmap(self, *, force: bool = False) -> None:
+        if self._pixmap_item is None:
+            return
+
+        rect = self._pixmap_item.sceneBoundingRect()
+        if rect.isNull() or rect.width() <= 0 or rect.height() <= 0:
+            return
+
+        viewport = self.view.viewport()
+        width = viewport.width()
+        height = viewport.height()
+        if width <= 0 or height <= 0:
+            if not force:
+                self._fit_pending = True
+                QTimer.singleShot(0, lambda: self._fit_view_to_pixmap(force=True))
+            return
+
+        scale_x = width / rect.width()
+        scale_y = height / rect.height()
+        scale = min(scale_x, scale_y)
+        if scale <= 0:
+            scale = 1.0
+
+        self._fit_pending = False
+        self._manual_zoom = False
+        self._apply_zoom(scale)
 
     def _update_scene_items(self, entry: ManualSplitEntry) -> None:
         left = entry.crop_left
@@ -814,6 +920,12 @@ class ManualSplitDialog(QDialog):
         else:
             self.resolutionWarningLabel.clear()
         self.resolutionWarningLabel.setVisible(bool(warnings))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if not self._manual_zoom:
+            self._fit_pending = True
+            QTimer.singleShot(0, lambda: self._fit_view_to_pixmap(force=True))
 
     def goto_metric_entry(self, metric: str) -> None:
         metrics = getattr(self, "_resolution_metrics", {}) or {}
