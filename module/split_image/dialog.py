@@ -5,7 +5,7 @@ from typing import List
 
 import numpy as np
 from PyQt5.QtCore import QObject, QPointF, QRectF, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QPainter, QPen, QPixmap
+from PyQt5.QtGui import QBrush, QColor, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -467,7 +467,7 @@ class ManualSplitDialog(QDialog):
             self.scene.addItem(self._crop_rect_item)
             self._crop_rect_item.setParentItem(self._content_group)
             self._crop_rect_item.setPen(pen)
-            self._crop_rect_item.setBrush(Qt.NoBrush)
+            self._crop_rect_item.setBrush(QBrush(Qt.NoBrush))
             self._crop_rect_item.setZValue(4)
 
         self._update_scene_items(entry)
