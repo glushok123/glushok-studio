@@ -509,6 +509,8 @@ class MainApp(QMainWindow):
 
                 target_page_width = 0
                 target_page_height = 0
+                target_spread_width = 0
+                target_spread_height = 0
 
                 if is_px_identically and entries:
                     for entry in entries:
@@ -520,8 +522,8 @@ class MainApp(QMainWindow):
 
                         if entry.split_disabled or final_image.ndim < 2:
                             height_val, width_val = final_image.shape[:2]
-                            target_page_width = max(target_page_width, width_val)
-                            target_page_height = max(target_page_height, height_val)
+                            target_spread_width = max(target_spread_width, width_val)
+                            target_spread_height = max(target_spread_height, height_val)
                             entry.release_image()
                             continue
 
@@ -537,6 +539,11 @@ class MainApp(QMainWindow):
                             target_page_height = max(target_page_height, height_val)
 
                         entry.release_image()
+
+                    if target_page_width > 0:
+                        dialog.target_page_width = target_page_width
+                    if target_page_height > 0:
+                        dialog.target_page_height = target_page_height
 
                     if target_page_width > 0 or target_page_height > 0:
                         for entry in entries:
@@ -605,6 +612,13 @@ class MainApp(QMainWindow):
                     if entry.split_disabled:
                         destination = entry.target_dir / entry.relative.name
                         destination.parent.mkdir(parents=True, exist_ok=True)
+                        if is_px_identically and final_image is not None and final_image.ndim >= 2:
+                            if target_spread_width > 0 and target_spread_height > 0:
+                                final_image = _fit_page_to_canvas(
+                                    final_image,
+                                    target_spread_width,
+                                    target_spread_height,
+                                )
                         if final_image is not None and final_image.ndim >= 2:
                             height_val, width_val = final_image.shape[:2]
                             max_observed_width = max(max_observed_width, width_val)
@@ -622,6 +636,18 @@ class MainApp(QMainWindow):
                         (split_result.right, entry.right_path),
                     ):
                         page_path.parent.mkdir(parents=True, exist_ok=True)
+                        if (
+                            is_px_identically
+                            and page_image is not None
+                            and page_image.ndim >= 2
+                            and target_page_width > 0
+                            and target_page_height > 0
+                        ):
+                            page_image = _fit_page_to_canvas(
+                                page_image,
+                                target_page_width,
+                                target_page_height,
+                            )
                         if page_image is not None and page_image.ndim >= 2:
                             height_val, width_val = page_image.shape[:2]
                             max_observed_width = max(max_observed_width, width_val)
