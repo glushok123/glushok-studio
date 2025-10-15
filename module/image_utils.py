@@ -290,16 +290,16 @@ def _build_split_result(colour: np.ndarray, split_x: int, overlap: int) -> Split
         left_page = colour[:, :half]
         right_page = colour[:, half:]
         split_x = half
-    else:
-        left_width = left_page.shape[1]
-        right_width = right_page.shape[1]
-        target_width = min(left_width, right_width)
 
-        if target_width > 0:
-            if left_width > target_width:
-                left_page = left_page[:, left_width - target_width :]
-            if right_width > target_width:
-                right_page = right_page[:, :target_width]
+    left_width = left_page.shape[1]
+    right_width = right_page.shape[1]
+    target_width = min(left_width, right_width)
+
+    if target_width > 0:
+        if left_width > target_width:
+            left_page = left_page[:, left_width - target_width :]
+        if right_width > target_width:
+            right_page = right_page[:, :target_width]
 
     return SplitResult(left=left_page, right=right_page, split_x=split_x)
 
