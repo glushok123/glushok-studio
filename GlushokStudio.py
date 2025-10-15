@@ -6,6 +6,7 @@ import re
 import tempfile
 import traceback
 import faulthandler
+import numpy as np
 from PyQt5 import uic, QtCore, QtGui
 from PyQt5.QtGui import QTextCursor, QIcon, QImage
 from PyQt5.QtWidgets import *
@@ -398,7 +399,9 @@ class MainApp(QMainWindow):
         from module.splitImage import (
             ManualSplitDialog,
             ManualSplitEntry,
-            _fit_page_to_canvas,
+            collect_resolution_metrics,
+            enforce_entry_targets,
+            trim_page_to_resolution,
             split_with_fixed_position,
         )
         from module.image_utils import save_with_dpi
@@ -506,32 +509,138 @@ class MainApp(QMainWindow):
                         entry.set_split_x(int(entry.auto_split_x))
                     print("[WARN] Пользователь отменил ручную корректировку, применены авто-параметры")
 
+                target_page_width = 0
+                target_page_height = 0
+                target_spread_width = 0
+                target_spread_height = 0
+
+                if is_px_identically and entries:
+                    metrics = getattr(dialog, "resolution_metrics", {})
+                    if not isinstance(metrics, dict) or int(metrics.get("total_entries") or 0) != len(entries):
+                        metrics = collect_resolution_metrics(entries)
+
+                    attempts = 0
+                    while True:
+                        target_page_width = int(metrics.get("target_page_width") or 0)
+                        target_page_height = int(metrics.get("target_page_height") or 0)
+                        target_spread_width = int(metrics.get("max_spread_width") or 0)
+                        target_spread_height = int(metrics.get("max_spread_height") or 0)
+
+                        for entry in entries:
+                            enforce_entry_targets(
+                                entry,
+                                target_page_width=target_page_width,
+                                target_page_height=target_page_height,
+                                target_spread_width=target_spread_width,
+                                target_spread_height=target_spread_height,
+                            )
+
+                        new_metrics = collect_resolution_metrics(entries)
+                        attempts += 1
+                        if (
+                            int(new_metrics.get("target_page_width") or 0) == target_page_width
+                            and int(new_metrics.get("target_page_height") or 0) == target_page_height
+                            and int(new_metrics.get("max_spread_width") or 0) == target_spread_width
+                            and int(new_metrics.get("max_spread_height") or 0) == target_spread_height
+                        ):
+                            metrics = new_metrics
+                            break
+
+                        metrics = new_metrics
+                        if attempts >= len(entries) + 3:
+                            break
+
+                    target_page_width = int(metrics.get("target_page_width") or 0)
+                    target_page_height = int(metrics.get("target_page_height") or 0)
+                    target_spread_width = int(metrics.get("max_spread_width") or 0)
+                    target_spread_height = int(metrics.get("max_spread_height") or 0)
+
+                    dialog.set_target_resolution(target_page_width, target_page_height)
+                    if hasattr(dialog, "_resolution_metrics"):
+                        dialog._resolution_metrics = metrics
+
+                max_observed_width = 0
+                max_observed_height = 0
+
                 for entry in entries:
                     entry.target_dir.mkdir(parents=True, exist_ok=True)
+
+                    if is_px_identically and (
+                        target_page_width > 0 or target_page_height > 0 or target_spread_width > 0
+                    ):
+                        enforce_entry_targets(
+                            entry,
+                            target_page_width=target_page_width,
+                            target_page_height=target_page_height,
+                            target_spread_width=target_spread_width,
+                            target_spread_height=target_spread_height,
+                        )
+
                     final_image = entry.build_processed_image()
+
                     if entry.split_disabled:
                         destination = entry.target_dir / entry.relative.name
                         destination.parent.mkdir(parents=True, exist_ok=True)
-                        save_with_dpi(final_image, destination, dpi_value)
+                        trimmed_image = final_image
+                        if (
+                            is_px_identically
+                            and trimmed_image is not None
+                            and trimmed_image.ndim >= 2
+                        ):
+                            effective_height = target_page_height
+                            if target_spread_height > 0:
+                                effective_height = max(effective_height, target_spread_height)
+                            trimmed_image = trim_page_to_resolution(
+                                trimmed_image,
+                                target_spread_width,
+                                effective_height,
+                                anchor_horizontal="center",
+                                anchor_vertical="center",
+                            )
+                        if trimmed_image is not None and trimmed_image.ndim >= 2:
+                            height_val, width_val = trimmed_image.shape[:2]
+                            max_observed_width = max(max_observed_width, width_val)
+                            max_observed_height = max(max_observed_height, height_val)
+                        save_with_dpi(trimmed_image, destination, dpi_value)
                         entry.release_image()
                         continue
 
                     final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
                     split_position = entry.final_split_position(final_width)
                     split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
-                    for page_image, page_path in (
-                        (split_result.left, entry.left_path),
-                        (split_result.right, entry.right_path),
+
+                    for side, page_image, page_path in (
+                        ("left", split_result.left, entry.left_path),
+                        ("right", split_result.right, entry.right_path),
                     ):
                         page_path.parent.mkdir(parents=True, exist_ok=True)
-                        if is_px_identically:
-                            if width_img and height_img:
-                                page_image = _fit_page_to_canvas(page_image, width_img, height_img)
-                            else:
-                                width_img = page_image.shape[1] if page_image.ndim >= 2 else 0
-                                height_img = page_image.shape[0] if page_image.ndim >= 2 else 0
-                        save_with_dpi(page_image, page_path, dpi_value)
+                        trimmed_page = page_image
+                        if (
+                            is_px_identically
+                            and trimmed_page is not None
+                            and trimmed_page.ndim >= 2
+                            and target_page_width > 0
+                            and target_page_height > 0
+                        ):
+                            anchor = "right" if side == "left" else "left"
+                            trimmed_page = trim_page_to_resolution(
+                                trimmed_page,
+                                target_page_width,
+                                target_page_height,
+                                anchor_horizontal=anchor,
+                                anchor_vertical="center",
+                            )
+                        if trimmed_page is not None and trimmed_page.ndim >= 2:
+                            height_val, width_val = trimmed_page.shape[:2]
+                            max_observed_width = max(max_observed_width, width_val)
+                            max_observed_height = max(max_observed_height, height_val)
+                        save_with_dpi(trimmed_page, page_path, dpi_value)
+
                     entry.release_image()
+
+                if is_px_identically:
+                    width_img = max(width_img, max_observed_width)
+                    height_img = max(height_img, max_observed_height)
 
                 if worker_thread is not None:
                     worker_thread.width_img = width_img
