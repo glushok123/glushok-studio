@@ -320,6 +320,8 @@ def collect_resolution_metrics(entries: List[ManualSplitEntry]) -> dict[str, int
         "max_spread_height": 0,
         "target_page_width": 0,
         "target_page_height": 0,
+        "max_width_index": None,
+        "max_width_side": None,
         "total_entries": len(entries),
     }
 
@@ -344,6 +346,15 @@ def collect_resolution_metrics(entries: List[ManualSplitEntry]) -> dict[str, int
     metrics["target_page_height"] = metrics["max_height"]
     metrics["target_page_width"] = max(metrics["max_left_width"], metrics["max_right_width"])
 
+    if metrics["max_right_width"] and (
+        metrics["max_right_width"] >= metrics["max_left_width"]
+    ):
+        metrics["max_width_index"] = metrics["max_right_index"]
+        metrics["max_width_side"] = "right"
+    elif metrics["max_left_width"]:
+        metrics["max_width_index"] = metrics["max_left_index"]
+        metrics["max_width_side"] = "left"
+
     return metrics
 
 
@@ -352,59 +363,46 @@ def _enforce_entry_height(entry: ManualSplitEntry, target_height: int) -> bool:
     if target_height <= 0:
         return False
 
-    max_height = entry.height
-    if target_height > max_height:
-        target_height = max_height
+    max_height = max(1, int(entry.height))
+    target_height = min(target_height, max_height)
+    if target_height <= 0:
+        return False
 
     current_height = entry.current_height
-    if current_height >= target_height:
+    if current_height == target_height:
         return False
 
     centre = entry.crop_top + current_height / 2.0
-    half = target_height / 2.0
-
-    new_top = centre - half
-    new_bottom = centre + half
+    new_top = int(round(centre - target_height / 2.0))
+    new_bottom = new_top + target_height
 
     if new_top < 0:
-        new_bottom -= new_top
         new_top = 0
+        new_bottom = target_height
     if new_bottom > max_height:
-        overflow = new_bottom - max_height
-        new_top -= overflow
         new_bottom = max_height
+        new_top = max(0, max_height - target_height)
 
-    new_top = max(0.0, new_top)
-    new_bottom = min(float(max_height), new_bottom)
+    if new_bottom - new_top > target_height:
+        excess = (new_bottom - new_top) - target_height
+        new_top += excess // 2
+        new_bottom = new_top + target_height
 
     if new_bottom - new_top < target_height:
-        needed = target_height - (new_bottom - new_top)
-        extra_top = min(new_top, needed / 2.0)
-        new_top -= extra_top
-        needed -= extra_top
-        new_bottom = min(float(max_height), new_bottom + needed)
-        if new_bottom - new_top < target_height and new_top > 0:
-            new_top = max(0.0, new_bottom - target_height)
-        if new_bottom - new_top < target_height:
-            new_bottom = min(float(max_height), new_top + target_height)
+        new_top = max(0, min(new_top, max_height - target_height))
+        new_bottom = new_top + target_height
 
-    top_int = int(np.floor(new_top))
-    bottom_int = int(np.ceil(new_bottom))
-    bottom_int = max(top_int + 1, min(entry.height, bottom_int))
+    new_top = max(0, min(new_top, max_height - 1))
+    new_bottom = max(new_top + 1, min(new_bottom, max_height))
 
-    if bottom_int - top_int < target_height and bottom_int < entry.height:
-        bottom_int = min(entry.height, top_int + target_height)
-    if bottom_int - top_int < target_height and top_int > 0:
-        top_int = max(0, bottom_int - target_height)
-    if bottom_int <= top_int:
-        bottom_int = min(entry.height, top_int + 1)
+    if new_bottom - new_top != target_height and target_height == max_height:
+        new_top = 0
+        new_bottom = max_height
 
-    if top_int == entry.crop_top and bottom_int == entry.crop_bottom:
-        return False
-
-    entry.crop_top = top_int
-    entry.crop_bottom = bottom_int
-    return True
+    changed = new_top != entry.crop_top or new_bottom != entry.crop_bottom
+    entry.crop_top = new_top
+    entry.crop_bottom = new_bottom
+    return changed
 
 
 def _enforce_spread_width(entry: ManualSplitEntry, target_width: int) -> bool:
@@ -412,59 +410,46 @@ def _enforce_spread_width(entry: ManualSplitEntry, target_width: int) -> bool:
     if target_width <= 0:
         return False
 
-    max_width = entry.width
-    if target_width > max_width:
-        target_width = max_width
+    max_width = max(1, int(entry.width))
+    target_width = min(target_width, max_width)
+    if target_width <= 0:
+        return False
 
     current_width = entry.current_width
-    if current_width >= target_width:
+    if current_width == target_width:
         return False
 
     centre = entry.crop_left + current_width / 2.0
-    half = target_width / 2.0
-
-    new_left = centre - half
-    new_right = centre + half
+    new_left = int(round(centre - target_width / 2.0))
+    new_right = new_left + target_width
 
     if new_left < 0:
-        new_right -= new_left
         new_left = 0
+        new_right = target_width
     if new_right > max_width:
-        overflow = new_right - max_width
-        new_left -= overflow
         new_right = max_width
+        new_left = max(0, max_width - target_width)
 
-    new_left = max(0.0, new_left)
-    new_right = min(float(max_width), new_right)
+    if new_right - new_left > target_width:
+        excess = (new_right - new_left) - target_width
+        new_left += excess // 2
+        new_right = new_left + target_width
 
     if new_right - new_left < target_width:
-        needed = target_width - (new_right - new_left)
-        extra_left = min(new_left, needed / 2.0)
-        new_left -= extra_left
-        needed -= extra_left
-        new_right = min(float(max_width), new_right + needed)
-        if new_right - new_left < target_width and new_left > 0:
-            new_left = max(0.0, new_right - target_width)
-        if new_right - new_left < target_width:
-            new_right = min(float(max_width), new_left + target_width)
+        new_left = max(0, min(new_left, max_width - target_width))
+        new_right = new_left + target_width
 
-    left_int = int(np.floor(new_left))
-    right_int = int(np.ceil(new_right))
-    right_int = max(left_int + 1, min(entry.width, right_int))
+    new_left = max(0, min(new_left, max_width - 1))
+    new_right = max(new_left + 1, min(new_right, max_width))
 
-    if right_int - left_int < target_width and right_int < entry.width:
-        right_int = min(entry.width, left_int + target_width)
-    if right_int - left_int < target_width and left_int > 0:
-        left_int = max(0, right_int - target_width)
-    if right_int <= left_int:
-        right_int = min(entry.width, left_int + 1)
+    if new_right - new_left != target_width and target_width == max_width:
+        new_left = 0
+        new_right = max_width
 
-    if left_int == entry.crop_left and right_int == entry.crop_right:
-        return False
-
-    entry.crop_left = left_int
-    entry.crop_right = right_int
-    return True
+    changed = new_left != entry.crop_left or new_right != entry.crop_right
+    entry.crop_left = new_left
+    entry.crop_right = new_right
+    return changed
 
 
 def _enforce_entry_width(entry: ManualSplitEntry, target_width: int) -> bool:
@@ -473,63 +458,40 @@ def _enforce_entry_width(entry: ManualSplitEntry, target_width: int) -> bool:
         return False
 
     base = int(entry.split_x_base)
-    overlap = max(0, int(entry.overlap))
-    changed = False
+    max_width = max(1, int(entry.width))
+    if base <= 0 or base >= max_width:
+        return False
 
-    def left_width() -> int:
-        return max(0, base - entry.crop_left + overlap)
+    target_width = min(target_width, max_width)
+    if target_width <= 0:
+        return False
 
-    def right_width() -> int:
-        return max(0, entry.crop_right - base + overlap)
+    min_overlap = max(0, target_width - base, base + target_width - max_width)
+    if min_overlap >= target_width:
+        return False
 
-    if left_width() < target_width:
-        deficit = target_width - left_width()
-        extend = min(deficit, entry.crop_left)
-        if extend > 0:
-            entry.crop_left -= extend
-            deficit -= extend
-            changed = True
-        if deficit > 0:
-            reducible = max(0, entry.crop_right - (base + 1))
-            adjust = min(deficit, reducible)
-            if adjust > 0:
-                entry.crop_right -= adjust
-                overlap += adjust
-                deficit -= adjust
-                changed = True
-        if deficit > 0:
-            overlap += deficit
-            deficit = 0
-            changed = True
+    desired_overlap = int(min(target_width - 1, max(min_overlap, int(entry.overlap))))
+    new_left = base + desired_overlap - target_width
+    new_right = base - desired_overlap + target_width
 
-    if right_width() < target_width:
-        deficit = target_width - right_width()
-        extend = min(deficit, entry.width - entry.crop_right)
-        if extend > 0:
-            entry.crop_right += extend
-            deficit -= extend
-            changed = True
-        if deficit > 0:
-            reducible = max(0, base - entry.crop_left)
-            adjust = min(deficit, reducible)
-            if adjust > 0:
-                entry.crop_left += adjust
-                overlap += adjust
-                deficit -= adjust
-                changed = True
-        if deficit > 0:
-            overlap += deficit
-            deficit = 0
-            changed = True
+    if new_left < 0 or new_right > max_width:
+        return False
 
-    entry.crop_left = max(0, min(entry.crop_left, entry.crop_right - 1))
-    entry.crop_right = max(entry.crop_left + 1, min(entry.crop_right, entry.width))
+    new_left = int(new_left)
+    new_right = int(new_right)
 
-    new_overlap = max(0, int(overlap))
-    if new_overlap != entry.overlap:
-        entry.overlap = new_overlap
-        changed = True
+    if new_right <= new_left:
+        return False
 
+    changed = (
+        new_left != entry.crop_left
+        or new_right != entry.crop_right
+        or desired_overlap != int(entry.overlap)
+    )
+
+    entry.crop_left = new_left
+    entry.crop_right = new_right
+    entry.overlap = desired_overlap
     entry.set_split_base(base)
     return changed
 
@@ -676,6 +638,14 @@ class ManualSplitDialog(QDialog):
         self.widthInfoLabel.setVisible(self._identical_resolution)
         self.resolutionWarningLabel.setVisible(False)
 
+        self.gotoHeightButton = QPushButton("Перейти к макс. высоте")
+        self.gotoWidthButton = QPushButton("Перейти к макс. ширине")
+        self.gotoHeightButton.clicked.connect(lambda: self.goto_metric_entry("height"))
+        self.gotoWidthButton.clicked.connect(lambda: self.goto_metric_entry("width"))
+        for button in (self.gotoHeightButton, self.gotoWidthButton):
+            button.setVisible(self._identical_resolution)
+            button.setEnabled(False)
+
         self.slider = QSlider(Qt.Horizontal)
         self.slider.valueChanged.connect(self.on_slider_changed)
 
@@ -776,6 +746,11 @@ class ManualSplitDialog(QDialog):
         layout.addWidget(self.positionLabel)
         layout.addWidget(self.heightInfoLabel)
         layout.addWidget(self.widthInfoLabel)
+        metricsButtonLayout = QHBoxLayout()
+        metricsButtonLayout.addWidget(self.gotoHeightButton)
+        metricsButtonLayout.addWidget(self.gotoWidthButton)
+        metricsButtonLayout.addStretch(1)
+        layout.addLayout(metricsButtonLayout)
         layout.addWidget(self.resolutionWarningLabel)
         layout.addLayout(splitControlLayout)
         layout.addLayout(rotationLayout)
@@ -844,6 +819,35 @@ class ManualSplitDialog(QDialog):
         if self.current_index >= len(self.entries) - 1:
             return
         self.current_index += 1
+        self.display_current_entry()
+
+    def goto_metric_entry(self, metric: str) -> None:
+        if not self.entries:
+            return
+
+        metrics = getattr(self, "_resolution_metrics", {}) or {}
+        if metric == "height":
+            index = metrics.get("max_height_index")
+        elif metric == "width":
+            index = metrics.get("max_width_index")
+        else:
+            index = None
+
+        if index is None:
+            return
+
+        try:
+            target_index = int(index)
+        except Exception:
+            return
+
+        if not (0 <= target_index < len(self.entries)):
+            return
+
+        if self.current_index == target_index:
+            return
+
+        self.current_index = target_index
         self.display_current_entry()
 
     def reset_current(self):
@@ -1133,25 +1137,12 @@ class ManualSplitDialog(QDialog):
         if entry.split_disabled:
             return
 
-        target_width = int(self._target_page_width)
-        target_height = int(self._target_page_height)
+        self._update_resolution_metrics()
+        metrics = getattr(self, "_resolution_metrics", {}) or {}
+        target_width = int(metrics.get("target_page_width") or self._target_page_width or 0)
+        target_height = int(metrics.get("target_page_height") or self._target_page_height or 0)
         if target_width <= 0 or target_height <= 0:
-            self._update_resolution_metrics()
-            target_width = int(self._target_page_width)
-            target_height = int(self._target_page_height)
-
-        if target_width <= 0 or target_height <= 0:
-            final_image = entry.build_processed_image()
-            final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
-            split_position = entry.final_split_position(final_width)
-            split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
-            if split_result.left.size:
-                target_width = split_result.left.shape[1]
-                target_height = split_result.left.shape[0]
-                self.set_target_resolution(target_width, target_height)
-                self._resolution_metrics = collect_resolution_metrics(self.entries)
-            if target_width <= 0 or target_height <= 0:
-                return
+            return
 
         enforce_entry_targets(
             entry,
@@ -1237,6 +1228,9 @@ class ManualSplitDialog(QDialog):
             self.resolutionWarningLabel.clear()
             self.resolutionWarningLabel.setVisible(False)
             self._resolution_metrics = {"total_entries": 0}
+            for button in (self.gotoHeightButton, self.gotoWidthButton):
+                button.setEnabled(False)
+                button.setVisible(False)
             return
 
         metrics = collect_resolution_metrics(self.entries)
@@ -1250,50 +1244,79 @@ class ManualSplitDialog(QDialog):
         if target_width > 0:
             self._target_page_width = target_width
 
+        for button in (self.gotoHeightButton, self.gotoWidthButton):
+            button.setVisible(True)
+
         height_text = "Максимальная высота рамки: —"
         height_index = metrics.get("max_height_index")
         if target_height > 0:
             if height_index is not None:
-                ref_entry = self.entries[int(height_index)]
-                height_text = (
-                    f"Максимальная высота рамки: {target_height}px "
-                    f"(страница {ref_entry.relative.name})"
-                )
+                idx = int(height_index)
+                if 0 <= idx < len(self.entries):
+                    ref_entry = self.entries[idx]
+                    number = idx + 1
+                    height_text = (
+                        f"Максимальная высота рамки: {target_height}px "
+                        f"(страница №{number} {ref_entry.relative.name})"
+                    )
+                    self.gotoHeightButton.setEnabled(True)
+                else:
+                    self.gotoHeightButton.setEnabled(False)
             else:
                 height_text = f"Максимальная высота рамки: {target_height}px"
+                self.gotoHeightButton.setEnabled(False)
+        else:
+            self.gotoHeightButton.setEnabled(False)
 
         left_value = int(metrics.get("max_left_width") or 0)
         right_value = int(metrics.get("max_right_width") or 0)
         left_index = metrics.get("max_left_index")
         right_index = metrics.get("max_right_index")
+        width_index = metrics.get("max_width_index")
+        width_side_key = metrics.get("max_width_side")
 
         width_text = "Максимальная ширина рамки: —"
         width_reference_side = ""
-        width_reference_name = ""
         width_reference_value = target_width
 
         if target_width > 0:
-            if right_value > left_value:
+            if width_side_key == "right":
                 width_reference_side = "правая"
-                width_reference_value = right_value
-                if right_index is not None:
-                    width_reference_name = self.entries[int(right_index)].relative.name
-            else:
+                width_reference_value = max(target_width, right_value)
+            elif width_side_key == "left":
                 width_reference_side = "левая"
-                width_reference_value = left_value if left_value >= right_value else right_value
-                if left_index is not None:
-                    width_reference_name = self.entries[int(left_index)].relative.name
-
-            if width_reference_name:
-                width_text = (
-                    f"Максимальная ширина рамки: {width_reference_value}px "
-                    f"({width_reference_side} страница {width_reference_name})"
-                )
+                width_reference_value = max(target_width, left_value)
             else:
-                width_text = (
-                    f"Максимальная ширина рамки: {width_reference_value}px "
-                    f"({width_reference_side} страница)"
-                )
+                width_reference_value = target_width
+
+            if width_reference_side:
+                if width_index is not None:
+                    idx = int(width_index)
+                    if 0 <= idx < len(self.entries):
+                        number = idx + 1
+                        ref_name = self.entries[idx].relative.name
+                        width_text = (
+                            f"Максимальная ширина рамки: {width_reference_value}px "
+                            f"({width_reference_side} страница №{number} {ref_name})"
+                        )
+                        self.gotoWidthButton.setEnabled(True)
+                    else:
+                        width_text = (
+                            f"Максимальная ширина рамки: {width_reference_value}px "
+                            f"({width_reference_side} страница)"
+                        )
+                        self.gotoWidthButton.setEnabled(False)
+                else:
+                    width_text = (
+                        f"Максимальная ширина рамки: {width_reference_value}px "
+                        f"({width_reference_side} страница)"
+                    )
+                    self.gotoWidthButton.setEnabled(False)
+            else:
+                width_text = f"Максимальная ширина рамки: {width_reference_value}px"
+                self.gotoWidthButton.setEnabled(False)
+        else:
+            self.gotoWidthButton.setEnabled(False)
 
         self.heightInfoLabel.setText(height_text)
         self.widthInfoLabel.setText(width_text)
@@ -1306,11 +1329,14 @@ class ManualSplitDialog(QDialog):
 
         if target_height > 0 and dims["height"] < target_height:
             if height_index is not None:
-                ref_entry = self.entries[int(height_index)]
-                warnings.append(
-                    f"⚠️ Высота рамки {dims['height']}px меньше требуемых {target_height}px "
-                    f"(максимум на странице {ref_entry.relative.name})."
-                )
+                idx = int(height_index)
+                if 0 <= idx < len(self.entries):
+                    ref_entry = self.entries[idx]
+                    number = idx + 1
+                    warnings.append(
+                        f"⚠️ Высота рамки {dims['height']}px меньше требуемых {target_height}px "
+                        f"(максимум на странице №{number} {ref_entry.relative.name})."
+                    )
             else:
                 warnings.append(
                     f"⚠️ Высота рамки {dims['height']}px меньше требуемых {target_height}px."
@@ -1319,22 +1345,28 @@ class ManualSplitDialog(QDialog):
         if not current_entry.split_disabled and target_width > 0:
             if dims["left_width"] < target_width:
                 if left_index is not None:
-                    ref_entry = self.entries[int(left_index)]
-                    warnings.append(
-                        f"⚠️ Левая половина {dims['left_width']}px меньше требуемых {target_width}px "
-                        f"(максимум на левой странице {ref_entry.relative.name}, {left_value}px)."
-                    )
+                    idx = int(left_index)
+                    if 0 <= idx < len(self.entries):
+                        ref_entry = self.entries[idx]
+                        number = idx + 1
+                        warnings.append(
+                            f"⚠️ Левая половина {dims['left_width']}px меньше требуемых {target_width}px "
+                            f"(максимум на левой странице №{number} {ref_entry.relative.name}, {left_value}px)."
+                        )
                 else:
                     warnings.append(
                         f"⚠️ Левая половина {dims['left_width']}px меньше требуемых {target_width}px."
                     )
             if dims["right_width"] < target_width:
                 if right_index is not None:
-                    ref_entry = self.entries[int(right_index)]
-                    warnings.append(
-                        f"⚠️ Правая половина {dims['right_width']}px меньше требуемых {target_width}px "
-                        f"(максимум на правой странице {ref_entry.relative.name}, {right_value}px)."
-                    )
+                    idx = int(right_index)
+                    if 0 <= idx < len(self.entries):
+                        ref_entry = self.entries[idx]
+                        number = idx + 1
+                        warnings.append(
+                            f"⚠️ Правая половина {dims['right_width']}px меньше требуемых {target_width}px "
+                            f"(максимум на правой странице №{number} {ref_entry.relative.name}, {right_value}px)."
+                        )
                 else:
                     warnings.append(
                         f"⚠️ Правая половина {dims['right_width']}px меньше требуемых {target_width}px."
@@ -1460,6 +1492,99 @@ def _fit_page_to_canvas(page: np.ndarray, target_width: int, target_height: int)
     x_offset = (target_width - new_width) // 2
     canvas[y_offset : y_offset + new_height, x_offset : x_offset + new_width] = resized
     return canvas
+
+
+def trim_page_to_resolution(
+    image: np.ndarray,
+    target_width: int,
+    target_height: int,
+    *,
+    anchor_horizontal: str = "center",
+    anchor_vertical: str = "center",
+) -> np.ndarray:
+    """Trim *image* so that it exactly matches the requested resolution.
+
+    The helper removes extra pixels without adding padding.  ``anchor_horizontal``
+    controls which side is preserved when cropping horizontally: ``"left"``,
+    ``"right"`` or ``"center"``.  The same applies to ``anchor_vertical`` for
+    the vertical axis.
+    """
+
+    if image is None or image.ndim < 2:
+        return image
+
+    target_width = int(target_width or 0)
+    target_height = int(target_height or 0)
+    height, width = image.shape[:2]
+
+    if target_width <= 0 and target_height <= 0:
+        return image
+
+    left = 0
+    top = 0
+    right = width
+    bottom = height
+
+    if target_width > 0 and width > target_width:
+        excess = width - target_width
+        if anchor_horizontal == "left":
+            right = target_width
+            left = 0
+        elif anchor_horizontal == "right":
+            left = width - target_width
+            right = width
+        else:
+            left = excess // 2
+            right = left + target_width
+        left = max(0, left)
+        right = min(width, right)
+
+    if target_height > 0 and height > target_height:
+        excess = height - target_height
+        if anchor_vertical == "top":
+            bottom = target_height
+            top = 0
+        elif anchor_vertical == "bottom":
+            top = height - target_height
+            bottom = height
+        else:
+            top = excess // 2
+            bottom = top + target_height
+        top = max(0, top)
+        bottom = min(height, bottom)
+
+    if target_width > 0 and right - left > target_width:
+        # Trim rounding leftovers so that the final size matches exactly.
+        adjustment = (right - left) - target_width
+        if anchor_horizontal == "right":
+            left += adjustment
+        elif anchor_horizontal == "left":
+            right -= adjustment
+        else:
+            left += adjustment // 2
+            right = left + target_width
+
+    if target_height > 0 and bottom - top > target_height:
+        adjustment = (bottom - top) - target_height
+        if anchor_vertical == "bottom":
+            top += adjustment
+        elif anchor_vertical == "top":
+            bottom -= adjustment
+        else:
+            top += adjustment // 2
+            bottom = top + target_height
+
+    left = max(0, min(left, width - 1 if width > 0 else 0))
+    top = max(0, min(top, height - 1 if height > 0 else 0))
+    right = max(left + 1, min(right, width))
+    bottom = max(top + 1, min(bottom, height))
+
+    if (right - left == width and target_width <= 0) and (
+        bottom - top == height and target_height <= 0
+    ):
+        return image
+
+    return image[top:bottom, left:right]
 
 
 def parseImage(self, file_path: Path) -> str | None:

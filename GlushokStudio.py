@@ -401,6 +401,7 @@ class MainApp(QMainWindow):
             ManualSplitEntry,
             collect_resolution_metrics,
             enforce_entry_targets,
+            trim_page_to_resolution,
             split_with_fixed_position,
         )
         from module.image_utils import save_with_dpi
@@ -563,16 +564,44 @@ class MainApp(QMainWindow):
 
                 for entry in entries:
                     entry.target_dir.mkdir(parents=True, exist_ok=True)
+
+                    if is_px_identically and (
+                        target_page_width > 0 or target_page_height > 0 or target_spread_width > 0
+                    ):
+                        enforce_entry_targets(
+                            entry,
+                            target_page_width=target_page_width,
+                            target_page_height=target_page_height,
+                            target_spread_width=target_spread_width,
+                            target_spread_height=target_spread_height,
+                        )
+
                     final_image = entry.build_processed_image()
 
                     if entry.split_disabled:
                         destination = entry.target_dir / entry.relative.name
                         destination.parent.mkdir(parents=True, exist_ok=True)
-                        if final_image is not None and final_image.ndim >= 2:
-                            height_val, width_val = final_image.shape[:2]
+                        trimmed_image = final_image
+                        if (
+                            is_px_identically
+                            and trimmed_image is not None
+                            and trimmed_image.ndim >= 2
+                        ):
+                            effective_height = target_page_height
+                            if target_spread_height > 0:
+                                effective_height = max(effective_height, target_spread_height)
+                            trimmed_image = trim_page_to_resolution(
+                                trimmed_image,
+                                target_spread_width,
+                                effective_height,
+                                anchor_horizontal="center",
+                                anchor_vertical="center",
+                            )
+                        if trimmed_image is not None and trimmed_image.ndim >= 2:
+                            height_val, width_val = trimmed_image.shape[:2]
                             max_observed_width = max(max_observed_width, width_val)
                             max_observed_height = max(max_observed_height, height_val)
-                        save_with_dpi(final_image, destination, dpi_value)
+                        save_with_dpi(trimmed_image, destination, dpi_value)
                         entry.release_image()
                         continue
 
@@ -580,16 +609,32 @@ class MainApp(QMainWindow):
                     split_position = entry.final_split_position(final_width)
                     split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
 
-                    for page_image, page_path in (
-                        (split_result.left, entry.left_path),
-                        (split_result.right, entry.right_path),
+                    for side, page_image, page_path in (
+                        ("left", split_result.left, entry.left_path),
+                        ("right", split_result.right, entry.right_path),
                     ):
                         page_path.parent.mkdir(parents=True, exist_ok=True)
-                        if page_image is not None and page_image.ndim >= 2:
-                            height_val, width_val = page_image.shape[:2]
+                        trimmed_page = page_image
+                        if (
+                            is_px_identically
+                            and trimmed_page is not None
+                            and trimmed_page.ndim >= 2
+                            and target_page_width > 0
+                            and target_page_height > 0
+                        ):
+                            anchor = "right" if side == "left" else "left"
+                            trimmed_page = trim_page_to_resolution(
+                                trimmed_page,
+                                target_page_width,
+                                target_page_height,
+                                anchor_horizontal=anchor,
+                                anchor_vertical="center",
+                            )
+                        if trimmed_page is not None and trimmed_page.ndim >= 2:
+                            height_val, width_val = trimmed_page.shape[:2]
                             max_observed_width = max(max_observed_width, width_val)
                             max_observed_height = max(max_observed_height, height_val)
-                        save_with_dpi(page_image, page_path, dpi_value)
+                        save_with_dpi(trimmed_page, page_path, dpi_value)
 
                     entry.release_image()
 
