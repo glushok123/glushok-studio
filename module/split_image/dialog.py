@@ -135,7 +135,11 @@ class ManualSplitDialog(QDialog):
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
 
         self._content_group = QGraphicsItemGroup()
-        self._content_group.setHandlesChildEvents(False)
+        # PyQt5 exposes ``setHandlesChildEvents`` on ``QGraphicsItem`` but not
+        # directly on ``QGraphicsItemGroup``.  Calling the base-class helper
+        # keeps the child crop handles responsive while still letting us group
+        # the overlay items together.
+        QGraphicsItem.setHandlesChildEvents(self._content_group, False)
         self._content_group.setFlag(QGraphicsItem.ItemHasNoContents, True)
         self.scene.addItem(self._content_group)
 
