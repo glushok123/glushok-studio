@@ -354,7 +354,6 @@ class ManualSplitDialog(QDialog):
         identical_resolution: bool = False,
         target_page_width: int | None = None,
         target_page_height: int | None = None,
-        enforce_identical_resolution: bool = False,
     ):
         super().__init__(parent)
         self.entries = entries
@@ -363,7 +362,6 @@ class ManualSplitDialog(QDialog):
         self._identical_resolution = bool(identical_resolution)
         self._target_page_width = int(target_page_width or 0)
         self._target_page_height = int(target_page_height or 0)
-        self._strict_resolution = bool(self._identical_resolution and enforce_identical_resolution)
 
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._split_line: QGraphicsLineItem | None = None
@@ -401,7 +399,7 @@ class ManualSplitDialog(QDialog):
             "Подогнать рамку под сохранённое разрешение страниц"
         )
         self.alignResolutionButton.clicked.connect(self.align_to_resolution)
-        self.alignResolutionButton.setVisible(self._identical_resolution and not self._strict_resolution)
+        self.alignResolutionButton.setVisible(self._identical_resolution)
         self.alignResolutionButton.setEnabled(False)
 
         self.resetButton = QPushButton("Сбросить настройки")
@@ -494,9 +492,6 @@ class ManualSplitDialog(QDialog):
 
         self.setLayout(layout)
 
-        if self._identical_resolution:
-            self._initialize_resolution_targets()
-
         if self.entries:
             self.display_current_entry()
         else:
@@ -508,241 +503,6 @@ class ManualSplitDialog(QDialog):
                 self.finishButton,
             ):
                 widget.setEnabled(False)
-
-    def _initialize_resolution_targets(self) -> None:
-        if not self.entries or not self._identical_resolution:
-            return
-
-        width = int(self._target_page_width)
-        height = int(self._target_page_height)
-
-        if width <= 0 or height <= 0:
-            inferred = self._infer_entry_resolution(self.entries[0])
-            if inferred is not None:
-                width, height = inferred
-
-        if self._strict_resolution:
-            width, height = self._compute_strict_target_resolution(width, height)
-
-        self.set_target_resolution(width, height)
-
-    def _infer_entry_resolution(self, entry: ManualSplitEntry) -> tuple[int, int] | None:
-        try:
-            final_image = entry.build_processed_image()
-        except Exception:
-            return None
-
-        if final_image.ndim < 2:
-            return None
-
-        final_width = final_image.shape[1]
-        split_position = entry.final_split_position(final_width)
-        split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
-        if not split_result.left.size:
-            return None
-
-        return split_result.left.shape[1], split_result.left.shape[0]
-
-    def _clamp_resolution_to_entries(self, width: int, height: int) -> tuple[int, int]:
-        if not self.entries:
-            return width, height
-
-        max_width_possible: int | None = None
-        min_width_required = 1
-        max_height_possible: int | None = None
-
-        for entry in self.entries:
-            overlap = max(0, int(entry.overlap))
-            half_limit = entry.width // 2
-            entry_max_width = int(half_limit + overlap)
-            if max_width_possible is None:
-                max_width_possible = entry_max_width
-            else:
-                max_width_possible = min(max_width_possible, entry_max_width)
-
-            min_width_required = max(min_width_required, max(1, 2 * overlap))
-
-            entry_height_limit = int(entry.height)
-            if max_height_possible is None:
-                max_height_possible = entry_height_limit
-            else:
-                max_height_possible = min(max_height_possible, entry_height_limit)
-
-        if max_width_possible is None:
-            max_width_possible = width
-        if max_height_possible is None:
-            max_height_possible = height
-
-        if max_width_possible <= 0:
-            max_width_possible = width
-
-        if width <= 0:
-            width = max_width_possible
-
-        width = min(width, max_width_possible)
-        if width < min_width_required:
-            width = min_width_required if min_width_required <= max_width_possible else max_width_possible
-
-        if height <= 0:
-            height = max_height_possible
-        height = min(height, max_height_possible)
-        height = max(1, height)
-
-        return int(width), int(height)
-
-    def _compute_strict_target_resolution(self, width: int, height: int) -> tuple[int, int]:
-        if not self.entries:
-            return int(width or 0), int(height or 0)
-
-        base_width = max(0, int(width or 0))
-        base_height = max(0, int(height or 0))
-
-        max_observed_width = base_width
-        max_observed_height = base_height
-        width_cap: int | None = None
-        height_cap: int | None = None
-        min_required_width = 1
-
-        for entry in self.entries:
-            if entry.split_disabled:
-                entry_height_cap = entry.height
-                height_cap = (
-                    entry_height_cap
-                    if height_cap is None
-                    else min(height_cap, entry_height_cap)
-                )
-                continue
-
-            overlap = max(0, int(entry.overlap))
-            current_width = max(0, int(entry.current_width))
-            if current_width > 0:
-                split = int(np.clip(entry.split_x, 0, current_width - 1))
-            else:
-                split = 0
-            left_page = overlap + split
-            right_page = overlap + (current_width - split)
-            max_observed_width = max(max_observed_width, left_page, right_page, base_width)
-
-            min_required_width = max(min_required_width, overlap + 1)
-
-            entry_cap = overlap + entry.width // 2
-            width_cap = entry_cap if width_cap is None else min(width_cap, entry_cap)
-
-            current_height = max(0, int(entry.current_height))
-            max_observed_height = max(max_observed_height, current_height, base_height)
-
-            entry_height_cap = entry.height
-            height_cap = (
-                entry_height_cap
-                if height_cap is None
-                else min(height_cap, entry_height_cap)
-            )
-
-        if width_cap is None:
-            width_cap = max(max_observed_width, min_required_width)
-        width_cap = max(width_cap, min_required_width)
-
-        target_width = max(max_observed_width, base_width, min_required_width)
-        target_width = min(target_width, width_cap)
-        target_width = max(target_width, min_required_width)
-
-        if height_cap is None:
-            height_cap = max(max_observed_height, base_height, 1)
-        height_cap = max(height_cap, 1)
-
-        target_height = max(max_observed_height, base_height, 1)
-        target_height = min(target_height, height_cap)
-        target_height = max(target_height, 1)
-
-        return int(target_width), int(target_height)
-
-    def _should_enforce_resolution(self, entry: ManualSplitEntry) -> bool:
-        return (
-            self._identical_resolution
-            and self._strict_resolution
-            and not entry.split_disabled
-            and self._target_page_width > 0
-            and self._target_page_height > 0
-        )
-
-    def _strict_crop_dimensions(self, entry: ManualSplitEntry) -> tuple[int, int, int]:
-        overlap = max(0, int(entry.overlap))
-        target_width = max(overlap + 1, int(self._target_page_width))
-        half_width = max(1, target_width - overlap)
-        entry_half_limit = max(1, entry.width // 2)
-        half_width = min(half_width, entry_half_limit)
-        desired_width = max(2, half_width * 2)
-
-        target_height = max(1, int(self._target_page_height))
-        desired_height = min(max(1, target_height), entry.height)
-
-        return int(desired_width), int(desired_height), int(half_width)
-
-    def _apply_resolution_constraints(
-        self, entry: ManualSplitEntry, *, update_ui: bool
-    ) -> None:
-        if not self._should_enforce_resolution(entry):
-            if update_ui:
-                self._sync_controls(entry)
-                self.refresh_scene()
-            return
-
-        desired_width, desired_height, half_width = self._strict_crop_dimensions(entry)
-        overlap = max(0, int(entry.overlap))
-        target_width = overlap + half_width
-
-        base = int(round(entry.split_x_base))
-        crop_left = base - half_width
-        crop_right = crop_left + desired_width
-
-        if crop_left < 0:
-            crop_left = 0
-            crop_right = desired_width
-            base = crop_left + half_width
-        if crop_right > entry.width:
-            crop_right = entry.width
-            crop_left = entry.width - desired_width
-            base = crop_left + half_width
-
-        current_height = entry.current_height
-        centre_y = entry.crop_top + current_height / 2.0 if current_height else entry.crop_top
-        half_height = desired_height / 2.0
-        crop_top = centre_y - half_height
-        crop_bottom = crop_top + desired_height
-
-        if crop_top < 0:
-            crop_top = 0
-            crop_bottom = desired_height
-        if crop_bottom > entry.height:
-            crop_bottom = entry.height
-            crop_top = entry.height - desired_height
-
-        crop_left = int(round(crop_left))
-        crop_right = int(round(crop_right))
-        crop_top = int(round(crop_top))
-        crop_bottom = int(round(crop_bottom))
-        desired_width = int(desired_width)
-        desired_height = int(desired_height)
-
-        crop_left = max(0, min(crop_left, entry.width - 1))
-        crop_right = max(crop_left + 1, min(crop_right, entry.width))
-        crop_top = max(0, min(crop_top, entry.height - 1))
-        crop_bottom = max(crop_top + 1, min(crop_bottom, entry.height))
-
-        previous_state = self._handling_crop_change
-        self._handling_crop_change = True
-        try:
-            entry.crop_left = crop_left
-            entry.crop_right = crop_right
-            entry.crop_top = crop_top
-            entry.crop_bottom = crop_bottom
-            entry.set_split_base(int(round(base)))
-        finally:
-            self._handling_crop_change = previous_state
-
-        if update_ui:
-            self._sync_controls(entry)
-            self.refresh_scene()
 
     def display_current_entry(self):
         if (
@@ -761,7 +521,6 @@ class ManualSplitDialog(QDialog):
             f"{entry.relative.name} ({self.current_index + 1}/{len(self.entries)})"
         )
         self.update_navigation()
-        self._apply_resolution_constraints(entry, update_ui=False)
         self._sync_controls(entry)
         self.refresh_scene()
 
@@ -776,14 +535,11 @@ class ManualSplitDialog(QDialog):
         if entry.split_disabled:
             return
         entry.set_split_x(int(value))
-        if self._should_enforce_resolution(entry):
-            self._apply_resolution_constraints(entry, update_ui=True)
-        else:
-            if self._split_line is not None:
-                self._split_line.setLine(
-                    entry.split_x_base, entry.crop_top, entry.split_x_base, entry.crop_bottom
-                )
-            self._update_split_status(entry)
+        if self._split_line is not None:
+            self._split_line.setLine(
+                entry.split_x_base, entry.crop_top, entry.split_x_base, entry.crop_bottom
+            )
+        self._update_split_status(entry)
 
     def goto_previous(self):
         if self.current_index <= 0:
@@ -809,11 +565,8 @@ class ManualSplitDialog(QDialog):
         entry.split_disabled = False
         auto_split = int(np.clip(entry.auto_split_x, 0, entry.width - 1)) if entry.width > 1 else 0
         entry.set_split_x(auto_split)
-        if self._should_enforce_resolution(entry):
-            self._apply_resolution_constraints(entry, update_ui=True)
-        else:
-            self._sync_controls(entry)
-            self.refresh_scene()
+        self._sync_controls(entry)
+        self.refresh_scene()
 
     def reset_rotation(self):
         if not self.entries:
@@ -942,54 +695,33 @@ class ManualSplitDialog(QDialog):
 
         min_width = 2
         min_height = 2
-        enforce = self._should_enforce_resolution(entry)
-        if enforce:
-            desired_width, desired_height, _ = self._strict_crop_dimensions(entry)
-            min_width = max(min_width, desired_width)
-            min_height = max(min_height, desired_height)
-        else:
-            desired_width = entry.current_width
-            desired_height = entry.current_height
         centre_x = rect.center().x()
         centre_y = rect.center().y()
 
         left_handle = self._handles["left"]
         left_handle.blockSignals(True)
-        if enforce:
-            left_limit_max = max(0.0, entry.width - min_width)
-            left_handle.set_limits(0, left_limit_max, centre_y)
-        else:
-            left_handle.set_limits(0, max(0.0, entry.crop_right - min_width), centre_y)
+        left_handle.set_limits(0, max(0.0, entry.crop_right - min_width), centre_y)
         left_handle.setPos(entry.crop_left, centre_y)
         left_handle.blockSignals(False)
         left_handle.setVisible(entry.current_width > min_width)
 
         right_handle = self._handles["right"]
         right_handle.blockSignals(True)
-        if enforce:
-            right_handle.set_limits(min_width, entry.width, centre_y)
-        else:
-            right_handle.set_limits(entry.crop_left + min_width, entry.width, centre_y)
+        right_handle.set_limits(entry.crop_left + min_width, entry.width, centre_y)
         right_handle.setPos(entry.crop_right, centre_y)
         right_handle.blockSignals(False)
         right_handle.setVisible(entry.current_width > min_width)
 
         top_handle = self._handles["top"]
         top_handle.blockSignals(True)
-        if enforce:
-            top_handle.set_limits(0, max(0.0, entry.height - min_height), centre_x)
-        else:
-            top_handle.set_limits(0, max(0.0, entry.crop_bottom - min_height), centre_x)
+        top_handle.set_limits(0, max(0.0, entry.crop_bottom - min_height), centre_x)
         top_handle.setPos(centre_x, entry.crop_top)
         top_handle.blockSignals(False)
         top_handle.setVisible(entry.current_height > min_height)
 
         bottom_handle = self._handles["bottom"]
         bottom_handle.blockSignals(True)
-        if enforce:
-            bottom_handle.set_limits(min_height, entry.height, centre_x)
-        else:
-            bottom_handle.set_limits(entry.crop_top + min_height, entry.height, centre_x)
+        bottom_handle.set_limits(entry.crop_top + min_height, entry.height, centre_x)
         bottom_handle.setPos(centre_x, entry.crop_bottom)
         bottom_handle.blockSignals(False)
         bottom_handle.setVisible(entry.current_height > min_height)
@@ -1025,94 +757,45 @@ class ManualSplitDialog(QDialog):
             width = entry.width
             height = entry.height
 
-            strict = self._should_enforce_resolution(entry)
-            if strict:
-                desired_width, desired_height, half_width = self._strict_crop_dimensions(entry)
-            else:
-                desired_width = None
-                desired_height = None
-                half_width = None
-
             left_val = entry.crop_left if left is None else int(left)
             right_val = entry.crop_right if right is None else int(right)
             top_val = entry.crop_top if top is None else int(top)
             bottom_val = entry.crop_bottom if bottom is None else int(bottom)
 
-            if strict:
-                desired_width = max(2, int(desired_width or entry.current_width))
-                desired_height = max(1, int(desired_height or entry.current_height))
+            left_val = max(0, min(left_val, width - 1))
+            right_val = max(1, min(right_val, width))
+            top_val = max(0, min(top_val, height - 1))
+            bottom_val = max(1, min(bottom_val, height))
 
-                left_min = 0
-                left_max = max(0, width - desired_width)
-                right_min = desired_width
-                right_max = width
+            min_width = 2
+            min_height = 2
 
-                top_min = 0
-                top_max = max(0, height - desired_height)
-                bottom_min = desired_height
-                bottom_max = height
-
-                if left is not None and right is None:
-                    left_val = int(np.clip(left_val, left_min, left_max))
-                    right_val = left_val + desired_width
-                elif right is not None and left is None:
-                    right_val = int(np.clip(right_val, right_min, right_max))
-                    left_val = right_val - desired_width
+            if right_val - left_val < min_width:
+                if left is None:
+                    left_val = max(0, right_val - min_width)
+                elif right is None:
+                    right_val = min(width, left_val + min_width)
                 else:
-                    left_val = int(np.clip(left_val, left_min, left_max))
-                    right_val = left_val + desired_width
+                    right_val = min(width, left_val + min_width)
 
-                if top is not None and bottom is None:
-                    top_val = int(np.clip(top_val, top_min, top_max))
-                    bottom_val = top_val + desired_height
-                elif bottom is not None and top is None:
-                    bottom_val = int(np.clip(bottom_val, bottom_min, bottom_max))
-                    top_val = bottom_val - desired_height
+            if bottom_val - top_val < min_height:
+                if top is None:
+                    top_val = max(0, bottom_val - min_height)
+                elif bottom is None:
+                    bottom_val = min(height, top_val + min_height)
                 else:
-                    top_val = int(np.clip(top_val, top_min, top_max))
-                    bottom_val = top_val + desired_height
-            else:
-                left_val = max(0, min(left_val, width - 1))
-                right_val = max(1, min(right_val, width))
-                top_val = max(0, min(top_val, height - 1))
-                bottom_val = max(1, min(bottom_val, height))
-
-                min_width = 2
-                min_height = 2
-
-                if right_val - left_val < min_width:
-                    if left is None:
-                        left_val = max(0, right_val - min_width)
-                    elif right is None:
-                        right_val = min(width, left_val + min_width)
-                    else:
-                        right_val = min(width, left_val + min_width)
-
-                if bottom_val - top_val < min_height:
-                    if top is None:
-                        top_val = max(0, bottom_val - min_height)
-                    elif bottom is None:
-                        bottom_val = min(height, top_val + min_height)
-                    else:
-                        bottom_val = min(height, top_val + min_height)
+                    bottom_val = min(height, top_val + min_height)
 
             entry.crop_left = left_val
             entry.crop_right = right_val
             entry.crop_top = top_val
             entry.crop_bottom = bottom_val
 
-            if strict and half_width is not None:
-                entry.set_split_base(int(entry.crop_left + half_width))
-            elif not strict:
-                entry.update_split_from_ratio()
-        finally:
-            self._handling_crop_change = False
-
-        if strict:
-            self._apply_resolution_constraints(entry, update_ui=True)
-        else:
+            entry.update_split_from_ratio()
             self._sync_controls(entry)
             self.refresh_scene()
+        finally:
+            self._handling_crop_change = False
 
     def _sync_controls(self, entry: ManualSplitEntry) -> None:
         self._updating = True
@@ -1120,33 +803,10 @@ class ManualSplitDialog(QDialog):
         width = entry.width
         height = entry.height
 
-        enforce = self._should_enforce_resolution(entry)
-
-        self.leftSpin.setMinimum(0)
-        self.topSpin.setMinimum(0)
-        self.rightSpin.setMinimum(1)
-        self.bottomSpin.setMinimum(1)
-
-        if enforce:
-            desired_width, desired_height, _ = self._strict_crop_dimensions(entry)
-            left_max = max(0, width - desired_width)
-            self.leftSpin.setMaximum(left_max)
-            fixed_right = entry.crop_left + desired_width
-            self.rightSpin.setMinimum(fixed_right)
-            self.rightSpin.setMaximum(fixed_right)
-
-            top_max = max(0, height - desired_height)
-            self.topSpin.setMaximum(top_max)
-            fixed_bottom = entry.crop_top + desired_height
-            self.bottomSpin.setMinimum(fixed_bottom)
-            self.bottomSpin.setMaximum(fixed_bottom)
-        else:
-            self.leftSpin.setMaximum(max(0, width - 1))
-            self.rightSpin.setMaximum(width)
-            self.topSpin.setMaximum(max(0, height - 1))
-            self.bottomSpin.setMaximum(height)
-            self.rightSpin.setMinimum(0)
-            self.bottomSpin.setMinimum(0)
+        self.leftSpin.setMaximum(max(0, width - 1))
+        self.rightSpin.setMaximum(width)
+        self.topSpin.setMaximum(max(0, height - 1))
+        self.bottomSpin.setMaximum(height)
 
         self.leftSpin.setValue(entry.crop_left)
         self.rightSpin.setValue(entry.crop_right)
@@ -1169,11 +829,8 @@ class ManualSplitDialog(QDialog):
             return
         entry = self.entries[self.current_index]
         entry.split_disabled = not bool(checked)
-        if self._should_enforce_resolution(entry):
-            self._apply_resolution_constraints(entry, update_ui=True)
-        else:
-            self._update_split_status(entry)
-            self.refresh_scene()
+        self._update_split_status(entry)
+        self.refresh_scene()
 
     def align_to_resolution(self) -> None:
         if not self.entries or not self._identical_resolution:
@@ -1185,13 +842,15 @@ class ManualSplitDialog(QDialog):
         target_width = int(self._target_page_width)
         target_height = int(self._target_page_height)
         if target_width <= 0 or target_height <= 0:
-            inferred = self._infer_entry_resolution(entry)
-            if inferred is not None:
-                self.set_target_resolution(*inferred)
-            return
-
-        if self._strict_resolution:
-            self._apply_resolution_constraints(entry, update_ui=True)
+            final_image = entry.build_processed_image()
+            final_width = final_image.shape[1] if final_image.ndim >= 2 else 0
+            split_position = entry.final_split_position(final_width)
+            split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
+            if split_result.left.size:
+                self.set_target_resolution(
+                    split_result.left.shape[1],
+                    split_result.left.shape[0],
+                )
             return
 
         overlap = max(0, int(entry.overlap))
@@ -1257,13 +916,12 @@ class ManualSplitDialog(QDialog):
 
         can_align = (
             self._identical_resolution
-            and not self._strict_resolution
             and not entry.split_disabled
             and self._target_page_width > 0
             and self._target_page_height > 0
         )
         self.alignResolutionButton.setEnabled(can_align)
-        self.alignResolutionButton.setVisible(self._identical_resolution and not self._strict_resolution)
+        self.alignResolutionButton.setVisible(self._identical_resolution)
 
     def _update_grid(self, entry: ManualSplitEntry) -> None:
         for line in self._grid_lines:
@@ -1317,35 +975,9 @@ class ManualSplitDialog(QDialog):
         return max(0, int(self._target_page_height))
 
     def set_target_resolution(self, width: int | None, height: int | None) -> None:
-        width_val = int(width or 0)
-        height_val = int(height or 0)
-
-        if (
-            self._identical_resolution
-            and self._strict_resolution
-            and width_val > 0
-            and height_val > 0
-        ):
-            width_val, height_val = self._clamp_resolution_to_entries(width_val, height_val)
-
-        self._target_page_width = width_val
-        self._target_page_height = height_val
-
-        if not self.entries:
-            return
-
-        if (
-            self._identical_resolution
-            and self._strict_resolution
-            and width_val > 0
-            and height_val > 0
-        ):
-            for entry in self.entries:
-                self._apply_resolution_constraints(entry, update_ui=False)
-            current_entry = self.entries[self.current_index]
-            self._sync_controls(current_entry)
-            self.refresh_scene()
-        else:
+        self._target_page_width = int(width or 0)
+        self._target_page_height = int(height or 0)
+        if self.entries:
             self._update_split_status(self.entries[self.current_index])
 
     def closeEvent(self, event):
