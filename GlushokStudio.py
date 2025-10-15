@@ -399,7 +399,8 @@ class MainApp(QMainWindow):
         from module.splitImage import (
             ManualSplitDialog,
             ManualSplitEntry,
-            _fit_page_to_canvas,
+            collect_resolution_metrics,
+            enforce_entry_targets,
             split_with_fixed_position,
         )
         from module.image_utils import save_with_dpi
@@ -513,94 +514,49 @@ class MainApp(QMainWindow):
                 target_spread_height = 0
 
                 if is_px_identically and entries:
-                    for entry in entries:
-                        try:
-                            final_image = entry.build_processed_image()
-                        except Exception:
-                            entry.release_image()
-                            continue
+                    metrics = getattr(dialog, "resolution_metrics", {})
+                    if not isinstance(metrics, dict) or int(metrics.get("total_entries") or 0) != len(entries):
+                        metrics = collect_resolution_metrics(entries)
 
-                        if entry.split_disabled or final_image.ndim < 2:
-                            height_val, width_val = final_image.shape[:2]
-                            target_spread_width = max(target_spread_width, width_val)
-                            target_spread_height = max(target_spread_height, height_val)
-                            entry.release_image()
-                            continue
+                    attempts = 0
+                    while True:
+                        target_page_width = int(metrics.get("target_page_width") or 0)
+                        target_page_height = int(metrics.get("target_page_height") or 0)
+                        target_spread_width = int(metrics.get("max_spread_width") or 0)
+                        target_spread_height = int(metrics.get("max_spread_height") or 0)
 
-                        final_width = final_image.shape[1]
-                        split_position = entry.final_split_position(final_width)
-                        split_result = split_with_fixed_position(final_image, split_position, entry.overlap)
-
-                        for page_image in (split_result.left, split_result.right):
-                            if page_image is None or page_image.ndim < 2:
-                                continue
-                            height_val, width_val = page_image.shape[:2]
-                            target_page_width = max(target_page_width, width_val)
-                            target_page_height = max(target_page_height, height_val)
-
-                        entry.release_image()
-
-                    if target_page_width > 0:
-                        dialog.target_page_width = target_page_width
-                    if target_page_height > 0:
-                        dialog.target_page_height = target_page_height
-
-                    if target_page_width > 0 or target_page_height > 0:
                         for entry in entries:
-                            if entry.split_disabled:
-                                continue
+                            enforce_entry_targets(
+                                entry,
+                                target_page_width=target_page_width,
+                                target_page_height=target_page_height,
+                                target_spread_width=target_spread_width,
+                                target_spread_height=target_spread_height,
+                            )
 
-                            base_position = int(entry.split_x_base)
-                            overlap_val = max(0, int(entry.overlap))
-                            changed = False
+                        new_metrics = collect_resolution_metrics(entries)
+                        attempts += 1
+                        if (
+                            int(new_metrics.get("target_page_width") or 0) == target_page_width
+                            and int(new_metrics.get("target_page_height") or 0) == target_page_height
+                            and int(new_metrics.get("max_spread_width") or 0) == target_spread_width
+                            and int(new_metrics.get("max_spread_height") or 0) == target_spread_height
+                        ):
+                            metrics = new_metrics
+                            break
 
-                            current_left_width = base_position - entry.crop_left + overlap_val
-                            if target_page_width > 0 and target_page_width > current_left_width:
-                                new_left = base_position + overlap_val - target_page_width
-                                new_left = int(np.floor(new_left))
-                                new_left = max(0, new_left)
-                                if new_left < entry.crop_left:
-                                    entry.crop_left = new_left
-                                    changed = True
+                        metrics = new_metrics
+                        if attempts >= len(entries) + 3:
+                            break
 
-                            current_right_width = entry.crop_right - base_position + overlap_val
-                            if target_page_width > 0 and target_page_width > current_right_width:
-                                new_right = target_page_width - overlap_val + base_position
-                                new_right = int(np.ceil(new_right))
-                                new_right = min(entry.width, new_right)
-                                if new_right > entry.crop_right:
-                                    entry.crop_right = max(entry.crop_left + 1, new_right)
-                                    changed = True
+                    target_page_width = int(metrics.get("target_page_width") or 0)
+                    target_page_height = int(metrics.get("target_page_height") or 0)
+                    target_spread_width = int(metrics.get("max_spread_width") or 0)
+                    target_spread_height = int(metrics.get("max_spread_height") or 0)
 
-                            desired_height = min(target_page_height, entry.height) if target_page_height else 0
-                            current_height = entry.crop_bottom - entry.crop_top
-                            if desired_height > current_height:
-                                centre_y = entry.crop_top + current_height / 2.0 if current_height else entry.crop_top
-                                half_height = desired_height / 2.0
-                                new_top = centre_y - half_height
-                                new_bottom = centre_y + half_height
-                                if new_top < 0:
-                                    new_top = 0
-                                    new_bottom = desired_height
-                                if new_bottom > entry.height:
-                                    new_bottom = entry.height
-                                    new_top = entry.height - desired_height
-
-                                new_top_int = int(np.floor(new_top))
-                                new_bottom_int = int(np.ceil(new_bottom))
-                                if new_bottom_int <= new_top_int:
-                                    new_bottom_int = min(entry.height, new_top_int + max(1, int(desired_height)))
-
-                                new_top_int = max(0, new_top_int)
-                                new_bottom_int = max(new_top_int + 1, min(entry.height, new_bottom_int))
-
-                                if new_top_int != entry.crop_top or new_bottom_int != entry.crop_bottom:
-                                    entry.crop_top = new_top_int
-                                    entry.crop_bottom = new_bottom_int
-                                    changed = True
-
-                            if changed:
-                                entry.set_split_base(base_position)
+                    dialog.set_target_resolution(target_page_width, target_page_height)
+                    if hasattr(dialog, "_resolution_metrics"):
+                        dialog._resolution_metrics = metrics
 
                 max_observed_width = 0
                 max_observed_height = 0
@@ -612,13 +568,6 @@ class MainApp(QMainWindow):
                     if entry.split_disabled:
                         destination = entry.target_dir / entry.relative.name
                         destination.parent.mkdir(parents=True, exist_ok=True)
-                        if is_px_identically and final_image is not None and final_image.ndim >= 2:
-                            if target_spread_width > 0 and target_spread_height > 0:
-                                final_image = _fit_page_to_canvas(
-                                    final_image,
-                                    target_spread_width,
-                                    target_spread_height,
-                                )
                         if final_image is not None and final_image.ndim >= 2:
                             height_val, width_val = final_image.shape[:2]
                             max_observed_width = max(max_observed_width, width_val)
@@ -636,18 +585,6 @@ class MainApp(QMainWindow):
                         (split_result.right, entry.right_path),
                     ):
                         page_path.parent.mkdir(parents=True, exist_ok=True)
-                        if (
-                            is_px_identically
-                            and page_image is not None
-                            and page_image.ndim >= 2
-                            and target_page_width > 0
-                            and target_page_height > 0
-                        ):
-                            page_image = _fit_page_to_canvas(
-                                page_image,
-                                target_page_width,
-                                target_page_height,
-                            )
                         if page_image is not None and page_image.ndim >= 2:
                             height_val, width_val = page_image.shape[:2]
                             max_observed_width = max(max_observed_width, width_val)
