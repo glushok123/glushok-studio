@@ -662,8 +662,10 @@ class ManualSplitDialog(QDialog):
         self.alignResolutionButton.setEnabled(False)
 
         self.resetButton = QPushButton("Сбросить настройки")
+        self.gotoFirstButton = QPushButton("В начало")
         self.prevButton = QPushButton("Предыдущее")
         self.nextButton = QPushButton("Следующее")
+        self.gotoLastButton = QPushButton("В конец")
         self.finishButton = QPushButton("Готово")
         self.cancelButton = QPushButton("Отмена")
         self.fullscreenButton = QPushButton("На весь экран")
@@ -680,9 +682,19 @@ class ManualSplitDialog(QDialog):
         self.gridButton.setToolTip("Показать вспомогательную сетку")
         self.fullscreenButton.setToolTip("Переключить полноэкранный режим окна")
 
+        self.gotoIndexSpin = QSpinBox()
+        self.gotoIndexSpin.setMinimum(1)
+        self.gotoIndexSpin.setMaximum(max(1, len(entries)))
+        self.gotoIndexSpin.setKeyboardTracking(False)
+        self.gotoIndexSpin.setFixedWidth(80)
+        self.gotoIndexButton = QPushButton("Перейти")
+
         self.resetButton.clicked.connect(self.reset_current)
+        self.gotoFirstButton.clicked.connect(self.goto_first)
         self.prevButton.clicked.connect(self.goto_previous)
         self.nextButton.clicked.connect(self.goto_next)
+        self.gotoLastButton.clicked.connect(self.goto_last)
+        self.gotoIndexButton.clicked.connect(self.goto_index)
         self.finishButton.clicked.connect(self.accept)
         self.cancelButton.clicked.connect(self.reject)
         self.fullscreenButton.toggled.connect(self.toggle_fullscreen)
@@ -714,8 +726,12 @@ class ManualSplitDialog(QDialog):
         cropLayout.addWidget(self.bottomSpin, 1, 3)
 
         buttonLayout = QHBoxLayout()
+        buttonLayout.addWidget(self.gotoFirstButton)
         buttonLayout.addWidget(self.prevButton)
+        buttonLayout.addWidget(self.gotoIndexSpin)
+        buttonLayout.addWidget(self.gotoIndexButton)
         buttonLayout.addWidget(self.nextButton)
+        buttonLayout.addWidget(self.gotoLastButton)
         buttonLayout.addStretch(1)
         buttonLayout.addWidget(self.resetButton)
         buttonLayout.addStretch(1)
@@ -764,8 +780,12 @@ class ManualSplitDialog(QDialog):
         else:
             for widget in (
                 self.slider,
+                self.gotoFirstButton,
                 self.prevButton,
                 self.nextButton,
+                self.gotoLastButton,
+                self.gotoIndexSpin,
+                self.gotoIndexButton,
                 self.resetButton,
                 self.finishButton,
             ):
@@ -792,8 +812,22 @@ class ManualSplitDialog(QDialog):
         self.refresh_scene()
 
     def update_navigation(self):
+        total = len(self.entries)
+        has_entries = total > 0
+
         self.prevButton.setEnabled(self.current_index > 0)
-        self.nextButton.setEnabled(self.current_index < len(self.entries) - 1)
+        self.nextButton.setEnabled(self.current_index < total - 1)
+        self.gotoFirstButton.setEnabled(has_entries and self.current_index > 0)
+        self.gotoLastButton.setEnabled(has_entries and self.current_index < total - 1)
+
+        self.gotoIndexSpin.setEnabled(has_entries)
+        self.gotoIndexButton.setEnabled(has_entries)
+
+        if has_entries:
+            self.gotoIndexSpin.blockSignals(True)
+            self.gotoIndexSpin.setRange(1, total)
+            self.gotoIndexSpin.setValue(self.current_index + 1)
+            self.gotoIndexSpin.blockSignals(False)
 
     def on_slider_changed(self, value: int):
         if self._updating or not self.entries:
@@ -819,6 +853,35 @@ class ManualSplitDialog(QDialog):
         if self.current_index >= len(self.entries) - 1:
             return
         self.current_index += 1
+        self.display_current_entry()
+
+    def goto_first(self):
+        if not self.entries or self.current_index == 0:
+            return
+        self.current_index = 0
+        self.display_current_entry()
+
+    def goto_last(self):
+        if not self.entries:
+            return
+        target = len(self.entries) - 1
+        if target <= 0 or self.current_index == target:
+            return
+        self.current_index = target
+        self.display_current_entry()
+
+    def goto_index(self):
+        if not self.entries:
+            return
+
+        value = int(self.gotoIndexSpin.value()) - 1
+        if value < 0 or value >= len(self.entries):
+            return
+
+        if value == self.current_index:
+            return
+
+        self.current_index = value
         self.display_current_entry()
 
     def goto_metric_entry(self, metric: str) -> None:
