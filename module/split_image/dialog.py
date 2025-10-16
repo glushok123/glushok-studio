@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
     QGraphicsItem,
+    QGraphicsItemGroup,
     QGraphicsLineItem,
     QGraphicsObject,
     QGraphicsPixmapItem,
@@ -132,6 +133,16 @@ class ManualSplitDialog(QDialog):
         self.view.setAlignment(Qt.AlignCenter)
         self.view.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+
+        self._content_group = QGraphicsItemGroup()
+        # Disable hit testing on the overlay container so mouse events go
+        # straight to the interactive items (crop handles, etc.).  Some PyQt5
+        # builds do not expose ``setHandlesChildEvents``; clearing the accepted
+        # mouse buttons achieves the same effect while keeping the overlays
+        # grouped together for positioning.
+        self._content_group.setAcceptedMouseButtons(Qt.NoButton)
+        self._content_group.setFlag(QGraphicsItem.ItemHasNoContents, True)
+        self.scene.addItem(self._content_group)
 
         self._zoom = 1.0
         self._manual_zoom = False
@@ -537,6 +548,7 @@ class ManualSplitDialog(QDialog):
             for side in ("left", "right", "top", "bottom"):
                 handle = CropHandle(side)
                 handle.moved.connect(lambda value, s=side: self._handle_moved(s, value))
+                handle.setParentItem(self._content_group)
                 self.scene.addItem(handle)
                 self._handles[side] = handle
 
