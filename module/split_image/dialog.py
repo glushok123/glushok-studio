@@ -88,13 +88,14 @@ class CropHandle(QGraphicsObject):
         return super().itemChange(change, value)
 
 
-class CropRectItem(QGraphicsRectItem):
+class CropRectItem(QObject, QGraphicsRectItem):
     """Interactive crop rectangle that exposes draggable edges."""
 
     edgeMoved = pyqtSignal(str, float)
 
     def __init__(self, parent: QGraphicsItem | None = None):
-        super().__init__(parent)
+        QObject.__init__(self, parent)
+        QGraphicsRectItem.__init__(self, parent)
         self._active_edge: str | None = None
         self._hover_edge: str | None = None
         self._grab_margin = 14.0
@@ -192,7 +193,7 @@ class ManualSplitDialog(QDialog):
 
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._split_line: QGraphicsLineItem | None = None
-        self._crop_rect_item: QGraphicsRectItem | None = None
+        self._crop_rect_item: CropRectItem | None = None
         self._handles: dict[str, CropHandle] = {}
         self._grid_lines: list[QGraphicsLineItem] = []
         self._loaded_entry: ManualSplitEntry | None = None
