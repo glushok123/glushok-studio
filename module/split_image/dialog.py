@@ -452,7 +452,7 @@ class ManualSplitDialog(QDialog):
             self._pixmap_item = QGraphicsPixmapItem(pixmap)
             self._pixmap_item.setTransformationMode(Qt.SmoothTransformation)
             self.scene.addItem(self._pixmap_item)
-            self._pixmap_item.setParentItem(self._content_group)
+            self._pixmap_item.setAcceptedMouseButtons(Qt.NoButton)
             self._pixmap_item.setZValue(0)
         else:
             self._pixmap_item.setPixmap(pixmap)
@@ -463,8 +463,8 @@ class ManualSplitDialog(QDialog):
             pen.setCosmetic(True)
             self._split_line = QGraphicsLineItem(0, 0, 0, 0)
             self.scene.addItem(self._split_line)
-            self._split_line.setParentItem(self._content_group)
             self._split_line.setPen(pen)
+            self._split_line.setAcceptedMouseButtons(Qt.NoButton)
             self._split_line.setZValue(5)
         if self._crop_rect_item is None:
             pen = QPen(QColor(255, 215, 0))
@@ -472,9 +472,9 @@ class ManualSplitDialog(QDialog):
             pen.setCosmetic(True)
             self._crop_rect_item = QGraphicsRectItem()
             self.scene.addItem(self._crop_rect_item)
-            self._crop_rect_item.setParentItem(self._content_group)
             self._crop_rect_item.setPen(pen)
             self._crop_rect_item.setBrush(QBrush(Qt.NoBrush))
+            self._crop_rect_item.setAcceptedMouseButtons(Qt.NoButton)
             self._crop_rect_item.setZValue(4)
 
         self._update_scene_items(entry)
@@ -798,14 +798,14 @@ class ManualSplitDialog(QDialog):
         for i in range(1, 3):
             x = left + width * i / 3.0
             line = self.scene.addLine(x, top, x, bottom, pen)
-            line.setParentItem(self._content_group)
+            line.setAcceptedMouseButtons(Qt.NoButton)
             line.setZValue(3)
             self._grid_lines.append(line)
 
         for i in range(1, 3):
             y = top + height * i / 3.0
             line = self.scene.addLine(left, y, right, y, pen)
-            line.setParentItem(self._content_group)
+            line.setAcceptedMouseButtons(Qt.NoButton)
             line.setZValue(3)
             self._grid_lines.append(line)
 
@@ -1092,11 +1092,6 @@ class ManualSplitDialog(QDialog):
         centre_x, centre_y = entry.crop_centre
         self._pixmap_item.setTransformOriginPoint(float(centre_x), float(centre_y))
         self._pixmap_item.setRotation(float(entry.rotation_deg))
-
-        if self._content_group is not None and self._content_group.rotation() != 0.0:
-            # Keep overlay geometry unrotated so the operator sees the original
-            # detection bounds even while the image preview is rotated.
-            self._content_group.setRotation(0.0)
 
     def _entry_dimensions_text(self, entry: ManualSplitEntry) -> str:
         dims = _entry_page_dimensions(entry)
