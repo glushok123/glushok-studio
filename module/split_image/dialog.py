@@ -14,7 +14,6 @@ from PyQt5.QtWidgets import (
     QGraphicsLineItem,
     QGraphicsObject,
     QGraphicsPixmapItem,
-    QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsView,
     QGridLayout,
@@ -88,19 +87,64 @@ class CropHandle(QGraphicsObject):
         return super().itemChange(change, value)
 
 
-class CropRectItem(QObject, QGraphicsRectItem):
+class CropRectItem(QGraphicsObject):
     """Interactive crop rectangle that exposes draggable edges."""
 
     edgeMoved = pyqtSignal(str, float)
 
     def __init__(self, parent: QGraphicsItem | None = None):
-        QObject.__init__(self, parent)
-        QGraphicsRectItem.__init__(self, parent)
+        super().__init__(parent)
+        self._rect = QRectF()
+        self._pen = QPen(QColor(255, 215, 0))
+        self._pen.setCosmetic(True)
+        self._brush = QBrush(Qt.NoBrush)
         self._active_edge: str | None = None
         self._hover_edge: str | None = None
         self._grab_margin = 14.0
         self.setAcceptHoverEvents(True)
         self.setZValue(30)
+
+    def boundingRect(self) -> QRectF:
+        if self._pen.style() == Qt.NoPen:
+            extra = 0.0
+        else:
+            extra = max(1.0, self._pen.widthF()) / 2.0
+        return self._rect.adjusted(-extra, -extra, extra, extra)
+
+    def paint(self, painter: QPainter, _option, _widget=None) -> None:
+        painter.setPen(self._pen)
+        painter.setBrush(self._brush)
+        painter.drawRect(self._rect)
+
+    def rect(self) -> QRectF:
+        return QRectF(self._rect)
+
+    def setRect(self, rect: QRectF) -> None:
+        rect = QRectF(rect).normalized()
+        if rect == self._rect:
+            return
+        self.prepareGeometryChange()
+        self._rect = rect
+        self.update()
+
+    def setPen(self, pen: QPen) -> None:
+        if pen == self._pen:
+            return
+        self.prepareGeometryChange()
+        self._pen = QPen(pen)
+        self.update()
+
+    def pen(self) -> QPen:
+        return QPen(self._pen)
+
+    def setBrush(self, brush: QBrush) -> None:
+        if brush == self._brush:
+            return
+        self._brush = QBrush(brush)
+        self.update()
+
+    def brush(self) -> QBrush:
+        return QBrush(self._brush)
 
     def _edge_at_pos(self, pos: QPointF) -> str | None:
         rect = self.rect()
