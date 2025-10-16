@@ -104,7 +104,10 @@ class PixelRuler(QWidget):
                 )
             )
             painter.setPen(QPen(QColor(236, 239, 241, 160), 2))
-            painter.drawLine(split_x, content_rect.top(), split_x, content_rect.bottom())
+            painter.drawLine(
+                QPointF(split_x, content_rect.top()),
+                QPointF(split_x, content_rect.bottom()),
+            )
         else:
             painter.setBrush(QColor(69, 90, 100, 90))
             painter.setPen(Qt.NoPen)
@@ -112,7 +115,10 @@ class PixelRuler(QWidget):
 
         baseline_y = content_rect.bottom()
         painter.setPen(QPen(QColor(158, 158, 158), 1))
-        painter.drawLine(content_rect.left(), baseline_y, content_rect.right(), baseline_y)
+        painter.drawLine(
+            QPointF(content_rect.left(), baseline_y),
+            QPointF(content_rect.right(), baseline_y),
+        )
 
         tick_step = self._calculate_tick_step(total)
         painter.setPen(QPen(QColor(207, 216, 220), 1))
@@ -125,7 +131,10 @@ class PixelRuler(QWidget):
         while tick <= total:
             ratio = tick / total
             x = content_rect.left() + ratio * content_rect.width()
-            painter.drawLine(x, baseline_y, x, baseline_y - 8)
+            painter.drawLine(
+                QPointF(x, baseline_y),
+                QPointF(x, baseline_y - 8),
+            )
             text = f"{int(tick)}"
             text_rect = painter.boundingRect(QRectF(), Qt.AlignCenter, text)
             text_rect.moveCenter(QPointF(x, baseline_y - 16))
@@ -136,7 +145,10 @@ class PixelRuler(QWidget):
 
         if tick - tick_step != total:
             x = content_rect.right()
-            painter.drawLine(x, baseline_y, x, baseline_y - 8)
+            painter.drawLine(
+                QPointF(x, baseline_y),
+                QPointF(x, baseline_y - 8),
+            )
             text = f"{total}"
             text_rect = painter.boundingRect(QRectF(), Qt.AlignCenter, text)
             text_rect.moveCenter(QPointF(x, baseline_y - 16))
