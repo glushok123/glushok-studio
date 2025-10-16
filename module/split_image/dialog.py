@@ -14,7 +14,6 @@ from PyQt5.QtWidgets import (
     QGraphicsLineItem,
     QGraphicsObject,
     QGraphicsPixmapItem,
-    QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsView,
     QGridLayout,
@@ -38,7 +37,7 @@ from .entries import (
 class CropHandle(QGraphicsObject):
     moved = pyqtSignal(float)
 
-    def __init__(self, orientation: str, size: float = 18.0, parent: QObject | None = None):
+    def __init__(self, orientation: str, size: float = 22.0, parent: QObject | None = None):
         super().__init__(parent)
         self.orientation = orientation
         self.size = size
@@ -46,11 +45,11 @@ class CropHandle(QGraphicsObject):
         self._maximum = float("inf")
         self._fixed = 0.0
         self._rect = QRectF(-size / 2.0, -size / 2.0, size, size)
-        self._pen = QPen(QColor(255, 255, 255, 220))
-        self._pen.setWidth(1)
-        self._brush = QColor(122, 215, 255, 180)
+        self._pen = QPen(QColor(10, 10, 10, 230))
+        self._pen.setWidth(2)
+        self._brush = QBrush(QColor(0, 174, 255, 220))
 
-        self.setZValue(10)
+        self.setZValue(40)
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
         self.setFlag(QGraphicsItem.ItemIgnoresTransformations, True)
@@ -64,7 +63,7 @@ class CropHandle(QGraphicsObject):
     def paint(self, painter: QPainter, _option, _widget=None) -> None:
         painter.setPen(self._pen)
         painter.setBrush(self._brush)
-        painter.drawRect(self._rect)
+        painter.drawRoundedRect(self._rect, 3, 3)
 
     def set_limits(self, minimum: float, maximum: float, fixed: float) -> None:
         self._minimum = float(minimum)
@@ -86,6 +85,133 @@ class CropHandle(QGraphicsObject):
             else:
                 self.moved.emit(self.pos().y())
         return super().itemChange(change, value)
+
+
+class CropRectItem(QGraphicsObject):
+    """Interactive crop rectangle that exposes draggable edges."""
+
+    edgeMoved = pyqtSignal(str, float)
+
+    def __init__(self, parent: QGraphicsItem | None = None):
+        super().__init__(parent)
+        self._rect = QRectF()
+        self._pen = QPen(QColor(255, 215, 0))
+        self._pen.setCosmetic(True)
+        self._brush = QBrush(Qt.NoBrush)
+        self._active_edge: str | None = None
+        self._hover_edge: str | None = None
+        self._grab_margin = 14.0
+        self.setAcceptHoverEvents(True)
+        self.setZValue(30)
+
+    def boundingRect(self) -> QRectF:
+        if self._pen.style() == Qt.NoPen:
+            extra = 0.0
+        else:
+            extra = max(1.0, self._pen.widthF()) / 2.0
+        return self._rect.adjusted(-extra, -extra, extra, extra)
+
+    def paint(self, painter: QPainter, _option, _widget=None) -> None:
+        painter.setPen(self._pen)
+        painter.setBrush(self._brush)
+        painter.drawRect(self._rect)
+
+    def rect(self) -> QRectF:
+        return QRectF(self._rect)
+
+    def setRect(self, rect: QRectF) -> None:
+        rect = QRectF(rect).normalized()
+        if rect == self._rect:
+            return
+        self.prepareGeometryChange()
+        self._rect = rect
+        self.update()
+
+    def setPen(self, pen: QPen) -> None:
+        if pen == self._pen:
+            return
+        self.prepareGeometryChange()
+        self._pen = QPen(pen)
+        self.update()
+
+    def pen(self) -> QPen:
+        return QPen(self._pen)
+
+    def setBrush(self, brush: QBrush) -> None:
+        if brush == self._brush:
+            return
+        self._brush = QBrush(brush)
+        self.update()
+
+    def brush(self) -> QBrush:
+        return QBrush(self._brush)
+
+    def _edge_at_pos(self, pos: QPointF) -> str | None:
+        rect = self.rect()
+        if rect.isNull():
+            return None
+        margin = self._grab_margin
+        left = rect.left()
+        right = rect.right()
+        top = rect.top()
+        bottom = rect.bottom()
+        x = pos.x()
+        y = pos.y()
+
+        within_vertical = top - margin <= y <= bottom + margin
+        within_horizontal = left - margin <= x <= right + margin
+
+        if within_vertical and abs(x - left) <= margin:
+            return "left"
+        if within_vertical and abs(x - right) <= margin:
+            return "right"
+        if within_horizontal and abs(y - top) <= margin:
+            return "top"
+        if within_horizontal and abs(y - bottom) <= margin:
+            return "bottom"
+        return None
+
+    def hoverMoveEvent(self, event):
+        edge = self._edge_at_pos(event.pos())
+        self._hover_edge = edge
+        if edge in {"left", "right"}:
+            self.setCursor(Qt.SizeHorCursor)
+        elif edge in {"top", "bottom"}:
+            self.setCursor(Qt.SizeVerCursor)
+        else:
+            self.unsetCursor()
+        super().hoverMoveEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        self._hover_edge = None
+        self.unsetCursor()
+        super().hoverLeaveEvent(event)
+
+    def mousePressEvent(self, event):
+        edge = self._edge_at_pos(event.pos())
+        if edge is not None and event.button() == Qt.LeftButton:
+            self._active_edge = edge
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._active_edge is not None:
+            scene_pos = event.scenePos()
+            if self._active_edge in {"left", "right"}:
+                self.edgeMoved.emit(self._active_edge, scene_pos.x())
+            else:
+                self.edgeMoved.emit(self._active_edge, scene_pos.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._active_edge is not None and event.button() == Qt.LeftButton:
+            self._active_edge = None
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 class ManualSplitDialog(QDialog):
@@ -111,7 +237,7 @@ class ManualSplitDialog(QDialog):
 
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._split_line: QGraphicsLineItem | None = None
-        self._crop_rect_item: QGraphicsRectItem | None = None
+        self._crop_rect_item: CropRectItem | None = None
         self._handles: dict[str, CropHandle] = {}
         self._grid_lines: list[QGraphicsLineItem] = []
         self._loaded_entry: ManualSplitEntry | None = None
@@ -142,6 +268,7 @@ class ManualSplitDialog(QDialog):
         # grouped together for positioning.
         self._content_group.setAcceptedMouseButtons(Qt.NoButton)
         self._content_group.setFlag(QGraphicsItem.ItemHasNoContents, True)
+        self._content_group.setZValue(25)
         self.scene.addItem(self._content_group)
 
         self._zoom = 1.0
@@ -468,14 +595,13 @@ class ManualSplitDialog(QDialog):
             self._split_line.setZValue(5)
         if self._crop_rect_item is None:
             pen = QPen(QColor(255, 215, 0))
-            pen.setWidth(4)
+            pen.setWidth(3)
             pen.setCosmetic(True)
-            self._crop_rect_item = QGraphicsRectItem()
+            self._crop_rect_item = CropRectItem()
             self.scene.addItem(self._crop_rect_item)
             self._crop_rect_item.setPen(pen)
             self._crop_rect_item.setBrush(QBrush(Qt.NoBrush))
-            self._crop_rect_item.setAcceptedMouseButtons(Qt.NoButton)
-            self._crop_rect_item.setZValue(4)
+            self._crop_rect_item.edgeMoved.connect(self._handle_moved)
 
         self._update_scene_items(entry)
         self._update_grid(entry)
@@ -548,8 +674,7 @@ class ManualSplitDialog(QDialog):
             for side in ("left", "right", "top", "bottom"):
                 handle = CropHandle(side)
                 handle.moved.connect(lambda value, s=side: self._handle_moved(s, value))
-                handle.setParentItem(self._content_group)
-                self.scene.addItem(handle)
+                self._content_group.addToGroup(handle)
                 self._handles[side] = handle
 
         min_width = 2
@@ -562,28 +687,28 @@ class ManualSplitDialog(QDialog):
         left_handle.set_limits(0, max(0.0, right - min_width), centre_y)
         left_handle.setPos(left, centre_y)
         left_handle.blockSignals(False)
-        left_handle.setVisible(right - left > min_width)
+        left_handle.setVisible(right - left >= min_width)
 
         right_handle = self._handles["right"]
         right_handle.blockSignals(True)
         right_handle.set_limits(left + min_width, entry.width, centre_y)
         right_handle.setPos(right, centre_y)
         right_handle.blockSignals(False)
-        right_handle.setVisible(right - left > min_width)
+        right_handle.setVisible(right - left >= min_width)
 
         top_handle = self._handles["top"]
         top_handle.blockSignals(True)
         top_handle.set_limits(0, max(0.0, bottom - min_height), centre_x)
         top_handle.setPos(centre_x, top)
         top_handle.blockSignals(False)
-        top_handle.setVisible(bottom - top > min_height)
+        top_handle.setVisible(bottom - top >= min_height)
 
         bottom_handle = self._handles["bottom"]
         bottom_handle.blockSignals(True)
         bottom_handle.set_limits(top + min_height, entry.height, centre_x)
         bottom_handle.setPos(centre_x, bottom)
         bottom_handle.blockSignals(False)
-        bottom_handle.setVisible(bottom - top > min_height)
+        bottom_handle.setVisible(bottom - top >= min_height)
 
     def _handle_moved(self, side: str, coordinate: float) -> None:
         if not self.entries or self._handling_crop_change:
