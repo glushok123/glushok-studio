@@ -600,7 +600,7 @@ class ManualSplitDialog(QDialog):
             self._crop_rect_item = CropRectItem()
             self.scene.addItem(self._crop_rect_item)
             self._crop_rect_item.setPen(pen)
-            self._crop_rect_item.setBrush(QBrush(QColor(255, 215, 0, 55)))
+            self._crop_rect_item.setBrush(QBrush(Qt.NoBrush))
             self._crop_rect_item.edgeMoved.connect(self._handle_moved)
 
         self._update_scene_items(entry)
