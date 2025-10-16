@@ -1,6 +1,7 @@
 """Qt dialog for manual fine-tuning of page splits."""
 from __future__ import annotations
 
+import math
 from typing import List
 
 import numpy as np
@@ -21,8 +22,10 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QSlider,
     QSpinBox,
+    QWidget,
     QVBoxLayout,
 )
 
@@ -32,6 +35,131 @@ from .entries import (
     collect_resolution_metrics,
     enforce_entry_targets,
 )
+
+
+class PixelRuler(QWidget):
+    """Simple horizontal ruler that reflects the current pixel metrics."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._total_width = 0
+        self._left_width = 0
+        self._right_width = 0
+        self._split_enabled = True
+        self.setVisible(False)
+        self.setMinimumHeight(44)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def set_metrics(
+        self,
+        total_width: int,
+        left_width: int,
+        right_width: int,
+        *,
+        split_enabled: bool,
+    ) -> None:
+        self._total_width = max(0, int(total_width))
+        self._left_width = max(0, int(left_width))
+        self._right_width = max(0, int(right_width))
+        self._split_enabled = bool(split_enabled)
+        self.setVisible(self._total_width > 0)
+        self.update()
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        if self._total_width <= 0:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        outer_rect = self.rect().adjusted(4, 6, -4, -6)
+        if outer_rect.width() <= 0 or outer_rect.height() <= 0:
+            return
+
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(32, 32, 32, 200))
+        painter.drawRoundedRect(outer_rect, 10, 10)
+
+        content_rect = outer_rect.adjusted(12, 12, -12, -12)
+        if content_rect.width() <= 0 or content_rect.height() <= 0:
+            return
+
+        total = max(1, self._total_width)
+        if self._split_enabled and self._left_width > 0 and self._right_width > 0:
+            left_ratio = float(self._left_width) / float(total)
+            left_ratio = float(np.clip(left_ratio, 0.0, 1.0))
+            split_x = content_rect.left() + left_ratio * content_rect.width()
+            painter.setBrush(QColor(66, 165, 245, 90))
+            painter.drawRect(
+                QRectF(content_rect.left(), content_rect.top(),
+                       max(0.0, split_x - content_rect.left()), content_rect.height())
+            )
+            painter.setBrush(QColor(102, 187, 106, 90))
+            painter.drawRect(
+                QRectF(
+                    split_x,
+                    content_rect.top(),
+                    max(0.0, content_rect.right() - split_x),
+                    content_rect.height(),
+                )
+            )
+            painter.setPen(QPen(QColor(236, 239, 241, 160), 2))
+            painter.drawLine(split_x, content_rect.top(), split_x, content_rect.bottom())
+        else:
+            painter.setBrush(QColor(69, 90, 100, 90))
+            painter.setPen(Qt.NoPen)
+            painter.drawRect(content_rect)
+
+        baseline_y = content_rect.bottom()
+        painter.setPen(QPen(QColor(158, 158, 158), 1))
+        painter.drawLine(content_rect.left(), baseline_y, content_rect.right(), baseline_y)
+
+        tick_step = self._calculate_tick_step(total)
+        painter.setPen(QPen(QColor(207, 216, 220), 1))
+        label_color = QColor(236, 239, 241)
+        font = painter.font()
+        font.setPointSize(max(9, font.pointSize()))
+        painter.setFont(font)
+
+        tick = 0
+        while tick <= total:
+            ratio = tick / total
+            x = content_rect.left() + ratio * content_rect.width()
+            painter.drawLine(x, baseline_y, x, baseline_y - 8)
+            text = f"{int(tick)}"
+            text_rect = painter.boundingRect(QRectF(), Qt.AlignCenter, text)
+            text_rect.moveCenter(QPointF(x, baseline_y - 16))
+            painter.setPen(label_color)
+            painter.drawText(text_rect, Qt.AlignCenter, text)
+            painter.setPen(QPen(QColor(207, 216, 220), 1))
+            tick += tick_step
+
+        if tick - tick_step != total:
+            x = content_rect.right()
+            painter.drawLine(x, baseline_y, x, baseline_y - 8)
+            text = f"{total}"
+            text_rect = painter.boundingRect(QRectF(), Qt.AlignCenter, text)
+            text_rect.moveCenter(QPointF(x, baseline_y - 16))
+            painter.setPen(label_color)
+            painter.drawText(text_rect, Qt.AlignCenter, text)
+
+    @staticmethod
+    def _calculate_tick_step(total: int) -> int:
+        if total <= 0:
+            return 1
+        target_ticks = max(3, min(10, int(total / 120) + 3))
+        raw_step = max(1.0, total / float(target_ticks))
+        magnitude = 10 ** int(math.floor(math.log10(raw_step)))
+        residual = raw_step / magnitude
+        if residual < 1.5:
+            nice = 1
+        elif residual < 3.5:
+            nice = 2
+        elif residual < 7.5:
+            nice = 5
+        else:
+            nice = 10
+        return max(1, int(nice * magnitude))
 
 
 class CropHandle(QGraphicsObject):
@@ -280,6 +408,7 @@ class ManualSplitDialog(QDialog):
 
         self.fileLabel = QLabel()
         self.positionLabel = QLabel()
+        self.positionLabel.setWordWrap(True)
         self.rotationLabel = QLabel()
 
         self.heightInfoLabel = QLabel()
@@ -292,6 +421,19 @@ class ManualSplitDialog(QDialog):
         self.heightInfoLabel.setVisible(self._identical_resolution)
         self.widthInfoLabel.setVisible(self._identical_resolution)
         self.resolutionWarningLabel.setVisible(False)
+
+        self.splitMetricsLabel = QLabel("Загрузка данных...")
+        self.splitMetricsLabel.setAlignment(Qt.AlignCenter)
+        metrics_font = self.splitMetricsLabel.font()
+        metrics_font.setPointSize(max(metrics_font.pointSize() + 1, 10))
+        metrics_font.setBold(True)
+        self.splitMetricsLabel.setFont(metrics_font)
+        self.splitMetricsLabel.setStyleSheet(
+            "background-color: rgba(21, 21, 21, 0.75);"
+            "color: #eceff1; padding: 10px 16px; border-radius: 12px;"
+        )
+
+        self.pixelRuler = PixelRuler(self)
 
         self.gotoHeightButton = QPushButton("Перейти к макс. высоте")
         self.gotoWidthButton = QPushButton("Перейти к макс. ширине")
@@ -438,26 +580,41 @@ class ManualSplitDialog(QDialog):
         zoomControlsLayout.addWidget(self.zoomSlider)
         zoomControlsLayout.addWidget(self.zoomLabel)
 
-        sideControlsLayout = QVBoxLayout()
-        sideControlsLayout.addLayout(zoomControlsLayout)
-        sideControlsLayout.addWidget(cropGroup)
-        sideControlsLayout.addStretch(1)
-
-        contentLayout = QHBoxLayout()
-        contentLayout.addLayout(sideControlsLayout)
-        contentLayout.addWidget(self.view, stretch=1)
-        contentLayout.setAlignment(sideControlsLayout, Qt.AlignTop)
-
-        layout.addLayout(contentLayout)
-        layout.addWidget(self.positionLabel)
-        layout.addWidget(self.heightInfoLabel)
-        layout.addWidget(self.widthInfoLabel)
         metricsButtonLayout = QHBoxLayout()
         metricsButtonLayout.addWidget(self.gotoHeightButton)
         metricsButtonLayout.addWidget(self.gotoWidthButton)
         metricsButtonLayout.addStretch(1)
-        layout.addLayout(metricsButtonLayout)
-        layout.addWidget(self.resolutionWarningLabel)
+
+        infoGroup = QGroupBox("Параметры разворота")
+        infoLayout = QVBoxLayout()
+        infoLayout.addWidget(self.positionLabel)
+        infoLayout.addWidget(self.heightInfoLabel)
+        infoLayout.addWidget(self.widthInfoLabel)
+        infoLayout.addLayout(metricsButtonLayout)
+        infoLayout.addWidget(self.resolutionWarningLabel)
+        infoLayout.addStretch(1)
+        infoGroup.setLayout(infoLayout)
+
+        sideControlsLayout = QVBoxLayout()
+        sideControlsLayout.setSpacing(16)
+        sideControlsLayout.addWidget(infoGroup)
+        sideControlsLayout.addLayout(zoomControlsLayout)
+        sideControlsLayout.addWidget(cropGroup)
+        sideControlsLayout.addStretch(1)
+
+        viewColumnLayout = QVBoxLayout()
+        viewColumnLayout.setContentsMargins(0, 0, 0, 0)
+        viewColumnLayout.setSpacing(12)
+        viewColumnLayout.addWidget(self.splitMetricsLabel)
+        viewColumnLayout.addWidget(self.pixelRuler)
+        viewColumnLayout.addWidget(self.view, stretch=1)
+
+        contentLayout = QHBoxLayout()
+        contentLayout.addLayout(sideControlsLayout)
+        contentLayout.addLayout(viewColumnLayout, stretch=1)
+        contentLayout.setAlignment(sideControlsLayout, Qt.AlignTop)
+
+        layout.addLayout(contentLayout)
         layout.addLayout(splitControlLayout)
         layout.addLayout(rotationLayout)
         layout.addLayout(buttonLayout)
@@ -479,6 +636,8 @@ class ManualSplitDialog(QDialog):
                 self.finishButton,
             ):
                 widget.setEnabled(False)
+            self.splitMetricsLabel.setText("Нет страниц для отображения")
+            self.pixelRuler.set_metrics(0, 0, 0, split_enabled=False)
 
     def display_current_entry(self):
         if (
@@ -810,6 +969,7 @@ class ManualSplitDialog(QDialog):
         self._update_width_info(entry)
 
     def _update_width_info(self, entry: ManualSplitEntry) -> None:
+        self._update_split_metrics(entry)
         if not self._identical_resolution:
             self.widthInfoLabel.clear()
             self.widthInfoLabel.setVisible(False)
@@ -822,12 +982,36 @@ class ManualSplitDialog(QDialog):
         self.widthInfoLabel.setText(text)
         self.widthInfoLabel.setVisible(True)
 
+    def _update_split_metrics(self, entry: ManualSplitEntry) -> None:
+        dims = _entry_page_dimensions(entry)
+        total_width = entry.current_width
+        height = dims.get("height", entry.current_height)
+        left_width = dims.get("left_width", 0)
+        right_width = dims.get("right_width", 0)
+
+        if entry.split_disabled:
+            text = f"Ширина изображения: {total_width}px · Высота: {height}px"
+        else:
+            text = (
+                f"Левая половина: {left_width}px · Правая половина: {right_width}px · "
+                f"Высота: {height}px"
+            )
+
+        self.splitMetricsLabel.setText(text)
+        self.pixelRuler.set_metrics(
+            total_width,
+            left_width,
+            right_width,
+            split_enabled=not entry.split_disabled,
+        )
+
     def on_split_toggled(self, checked: bool) -> None:
         if self._updating or not self.entries:
             return
         entry = self.entries[self.current_index]
         entry.split_disabled = not bool(checked)
         self._update_split_status(entry)
+        self._update_width_info(entry)
         self.refresh_scene()
 
     def align_to_resolution(self) -> None:
