@@ -369,6 +369,8 @@ class ManualSplitDialog(QDialog):
         super().__init__(parent)
 
         self.entries = entries
+        self.removed_entries: list[ManualSplitEntry] = []
+        self._original_entries_snapshot = list(entries)
         self.current_index = 0
 
         self._identical_resolution = bool(identical_resolution)
@@ -471,6 +473,7 @@ class ManualSplitDialog(QDialog):
         self.alignResolutionButton.setEnabled(False)
 
         self.resetButton = QPushButton("Сбросить настройки")
+        self.deleteButton = QPushButton("Удалить изображение")
         self.gotoFirstButton = QPushButton("В начало")
         self.prevButton = QPushButton("Предыдущее")
         self.nextButton = QPushButton("Следующее")
@@ -523,6 +526,7 @@ class ManualSplitDialog(QDialog):
         self.cancelButton.clicked.connect(self.reject)
         self.fullscreenButton.toggled.connect(self.toggle_fullscreen)
         self.gridButton.toggled.connect(self.refresh_scene)
+        self.deleteButton.clicked.connect(self.remove_current_entry)
         self.rotateLeftButton.clicked.connect(lambda: self.adjust_rotation(-self.ROTATION_STEP))
         self.rotateRightButton.clicked.connect(lambda: self.adjust_rotation(self.ROTATION_STEP))
         self.resetRotationButton.clicked.connect(self.reset_rotation)
@@ -558,6 +562,7 @@ class ManualSplitDialog(QDialog):
         buttonLayout.addWidget(self.gotoLastButton)
         buttonLayout.addStretch(1)
         buttonLayout.addWidget(self.resetButton)
+        buttonLayout.addWidget(self.deleteButton)
         buttonLayout.addStretch(1)
         buttonLayout.addWidget(self.cancelButton)
         buttonLayout.addWidget(self.finishButton)
@@ -645,11 +650,12 @@ class ManualSplitDialog(QDialog):
                 self.gotoIndexSpin,
                 self.gotoIndexButton,
                 self.resetButton,
-                self.finishButton,
+                self.deleteButton,
             ):
                 widget.setEnabled(False)
             self.splitMetricsLabel.setText("Нет страниц для отображения")
             self.pixelRuler.set_metrics(0, 0, 0, split_enabled=False)
+            self.finishButton.setEnabled(True)
 
     def display_current_entry(self):
         if (
@@ -683,6 +689,8 @@ class ManualSplitDialog(QDialog):
         self.gotoFirstButton.setEnabled(has_entries and self.current_index > 0)
         self.gotoLastButton.setEnabled(has_entries and self.current_index < total - 1)
 
+        self.deleteButton.setEnabled(has_entries)
+
         self.gotoIndexSpin.setEnabled(has_entries)
         self.gotoIndexButton.setEnabled(has_entries)
 
@@ -690,6 +698,11 @@ class ManualSplitDialog(QDialog):
             self.gotoIndexSpin.blockSignals(True)
             self.gotoIndexSpin.setRange(1, total)
             self.gotoIndexSpin.setValue(self.current_index + 1)
+            self.gotoIndexSpin.blockSignals(False)
+        else:
+            self.gotoIndexSpin.blockSignals(True)
+            self.gotoIndexSpin.setRange(0, 0)
+            self.gotoIndexSpin.setValue(0)
             self.gotoIndexSpin.blockSignals(False)
 
         for widget in (
@@ -1404,7 +1417,94 @@ class ManualSplitDialog(QDialog):
             if previous_index == self.current_index:
                 return
             return
+        if event.key() == Qt.Key_Delete and event.modifiers() == Qt.NoModifier:
+            if self.deleteButton.isEnabled():
+                self.remove_current_entry()
+                event.accept()
+                return
         super().keyPressEvent(event)
+
+    def remove_current_entry(self) -> None:
+        if not self.entries or not (0 <= self.current_index < len(self.entries)):
+            return
+
+        entry = self.entries.pop(self.current_index)
+        self.removed_entries.append(entry)
+        try:
+            entry.release_image()
+        except Exception:
+            pass
+
+        self._last_loaded_index = None
+
+        if self.entries:
+            self.current_index = max(0, min(self.current_index, len(self.entries) - 1))
+            self._resolution_metrics = collect_resolution_metrics(self.entries)
+            self.display_current_entry()
+        else:
+            self.current_index = 0
+            self._resolution_metrics = {"total_entries": 0}
+            self._handle_no_entries_left()
+
+    def _handle_no_entries_left(self) -> None:
+        self._clear_scene()
+        self.update_navigation()
+        self.slider.setEnabled(False)
+        self.splitToggle.setEnabled(False)
+        self.alignResolutionButton.setEnabled(False)
+        self.gridButton.setEnabled(False)
+        self.resetButton.setEnabled(False)
+        self.deleteButton.setEnabled(False)
+        self.rotateLeftButton.setEnabled(False)
+        self.rotateRightButton.setEnabled(False)
+        self.resetRotationButton.setEnabled(False)
+        self.alignResolutionButton.setVisible(self._identical_resolution)
+        self.fileLabel.setText("Нет страниц для отображения")
+        self.positionLabel.clear()
+        self.rotationLabel.setText("Поворот: 0.00°")
+        self.splitMetricsLabel.setText("Нет страниц для отображения")
+        self.pixelRuler.set_metrics(0, 0, 0, split_enabled=False)
+        self.widthInfoLabel.clear()
+        self.heightInfoLabel.clear()
+        self.resolutionWarningLabel.clear()
+        self.resolutionWarningLabel.setVisible(False)
+        self.gotoHeightButton.setEnabled(False)
+        self.gotoWidthButton.setEnabled(False)
+        self.finishButton.setEnabled(True)
+
+    def _clear_scene(self) -> None:
+        if self._pixmap_item is not None:
+            self.scene.removeItem(self._pixmap_item)
+            self._pixmap_item = None
+        if self._split_line is not None:
+            self.scene.removeItem(self._split_line)
+            self._split_line = None
+        if self._crop_rect_item is not None:
+            try:
+                self._crop_rect_item.edgeMoved.disconnect(self._handle_moved)
+            except Exception:
+                pass
+            self.scene.removeItem(self._crop_rect_item)
+            self._crop_rect_item = None
+        for handle in self._handles.values():
+            try:
+                self.scene.removeItem(handle)
+            except Exception:
+                pass
+        self._handles.clear()
+        for line in self._grid_lines:
+            try:
+                self.scene.removeItem(line)
+            except Exception:
+                pass
+        self._grid_lines.clear()
+        self.scene.update()
+
+    def reject(self) -> None:  # type: ignore[override]
+        if self.entries != self._original_entries_snapshot:
+            self.entries[:] = list(self._original_entries_snapshot)
+        self.removed_entries.clear()
+        super().reject()
 
     def _apply_rotation(self, entry: ManualSplitEntry) -> None:
         if self._pixmap_item is None:
