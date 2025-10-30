@@ -304,12 +304,20 @@ def _build_split_result(colour: np.ndarray, split_x: int, overlap: int) -> Split
     return SplitResult(left=left_page, right=right_page, split_x=split_x)
 
 
-def split_spread(image: np.ndarray, overlap: int, centre_tolerance: int = 0) -> SplitResult:
+def split_spread(
+    image: np.ndarray,
+    overlap: int,
+    centre_tolerance: int = 0,
+    *,
+    force_centre: bool = False,
+) -> SplitResult:
     """Split a double-page spread *image* into two halves with *overlap* pixels.
 
     The function keeps the pages symmetric: both parts contain the shared
     gutter area, so the user can later decide what to keep when performing
-    manual post-processing.
+    manual post-processing. When ``force_centre`` is ``True`` the gutter is
+    fixed to the centre of the detected document bounds (falling back to the
+    geometric centre of the spread when no bounds are available).
     """
     if image.ndim == 2:
         gray = image
@@ -319,6 +327,14 @@ def split_spread(image: np.ndarray, overlap: int, centre_tolerance: int = 0) -> 
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     height, width = gray.shape
+
+    if force_centre:
+        bounds = detect_content_bounds(gray)
+        if bounds and bounds.width > 0:
+            centre = (bounds.left + bounds.right) // 2
+        else:
+            centre = width // 2
+        return _build_split_result(colour, centre, overlap)
 
     search_radius = max(0, int(centre_tolerance)) if centre_tolerance else None
 

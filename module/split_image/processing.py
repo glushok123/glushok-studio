@@ -330,7 +330,13 @@ def parseImage(worker, file_path: Path) -> str | None:
 
     try:
         spread_source = analysis_image if manual_mode else image
-        spread = split_spread(spread_source, worker.width_px, worker.pxMediumVal)
+        force_centre = bool(getattr(worker, "isSplitByPixels", False))
+        spread = split_spread(
+            spread_source,
+            worker.width_px,
+            worker.pxMediumVal,
+            force_centre=force_centre,
+        )
     except Exception as exc:
         print(f"[WARN] Не удалось разделить {file_path}: {exc}")
         save_path = target_dir / relative.name

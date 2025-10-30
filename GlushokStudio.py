@@ -146,6 +146,7 @@ class MainApp(QMainWindow):
         self.isAddBorderForAll = True
         self.isAddBlackBorder = False
         self.isPxIdentically = False
+        self.isSplitByPixels = False
         self._activeManualDialog = None
 
         # Пути к helper-функциям из module.helper и module.addListWidget
@@ -162,7 +163,18 @@ class MainApp(QMainWindow):
         self.showStartImage = showStartImage.__get__(self)
         self.showEndImage = showEndImage.__get__(self)
 
+        if hasattr(self, 'checkBox_3') and hasattr(self, 'checkBox_split_pixels'):
+            self.checkBox_3.toggled.connect(self._update_split_pixels_option)
+            self._update_split_pixels_option(self.checkBox_3.isChecked())
+
         self.initUI()
+
+    def _update_split_pixels_option(self, checked: bool) -> None:
+        if not hasattr(self, 'checkBox_split_pixels'):
+            return
+        self.checkBox_split_pixels.setEnabled(bool(checked))
+        if not checked:
+            self.checkBox_split_pixels.setChecked(False)
 
     def initUI(self):
         # Кнопка "ВЫПОЛНИТЬ" теперь запускает очередь
@@ -362,6 +374,7 @@ class MainApp(QMainWindow):
             self.count_cpu,
             self.isRemoveBorder,
             self.isSplit,
+            self.isSplitByPixels,
             self.isManualSplitAdjust,
             self.isAddBorder,
             self.isAddBorderForAll,

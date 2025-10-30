@@ -26,6 +26,7 @@ class ThreadStart(QThread):
                  count_cpu,
                  isRemoveBorder,
                  isSplit,
+                 isSplitByPixels,
                  isManualSplitAdjust,
                  isAddBorder,
                  isAddBorderForAll,
@@ -46,6 +47,7 @@ class ThreadStart(QThread):
         self.count_cpu = count_cpu
         self.isRemoveBorder = isRemoveBorder
         self.isSplit = isSplit
+        self.isSplitByPixels = isSplitByPixels
         self.isManualSplitAdjust = isManualSplitAdjust
         self.isAddBorder = isAddBorder
         self.isAddBorderForAll = isAddBorderForAll
@@ -77,6 +79,7 @@ class ThreadStart(QThread):
             self.log.emit(f"[DEBUG] Граница: {self.border_px}")
             self.log.emit(f"[DEBUG] Удаление рамки: {self.isRemoveBorder}")
             self.log.emit(f"[DEBUG] Разделение: {self.isSplit}")
+            self.log.emit(f"[DEBUG] Деление по пикселям: {self.isSplitByPixels}")
             self.log.emit(f"[DEBUG] Добавление рамки: {self.isAddBorder}")
             self.log.emit(f"[DEBUG] Путь к файлу: {self.fileurl}")
             
